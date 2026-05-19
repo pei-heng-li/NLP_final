@@ -1,0 +1,23 @@
+cat << EOF > .gitignore
+# 排除 Python 暫存與虛擬環境
+__pycache__/
+*.pyc
+.pytest_cache/
+miniconda3/
+.cache/
+
+# 排除 MELD 資料集的大檔（音訊、影片、原始資料）
+*.mp4
+*.wav
+*.avi
+MELD.Raw/
+roberta_meld/
+MELD.Raw.tar.gz
+
+
+# 排除大模型權重或產出的巨大結果
+*.pt
+*.pth
+*.bin
+*.pkl
+EOF

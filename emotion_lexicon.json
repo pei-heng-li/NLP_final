@@ -1,0 +1,40 @@
+{
+  "joy": [
+    "happy", "happier", "happiest", "happiness", "glad", "delighted", "delight", "delightful",
+    "joy", "joyful", "cheerful", "excited", "exciting", "thrilled", "pleased", "great", "awesome",
+    "amazing", "fantastic", "wonderful", "excellent", "love", "lovely", "loved", "like", "liked",
+    "fun", "funny", "laugh", "laughing", "smile", "smiling", "celebrate", "celebrating", "proud",
+    "relieved", "relief", "yay", "hooray", "nice", "good", "cool", "perfect"
+  ],
+  "sadness": [
+    "sad", "sadness", "unhappy", "depressed", "depression", "miserable", "upset", "heartbroken",
+    "sorry", "sorrow", "sorrowful", "cry", "cried", "crying", "tears", "tearful", "lonely", "alone",
+    "hurt", "hurting", "painful", "pain", "grief", "grieving", "miss", "missing", "disappointed",
+    "disappointing", "regret", "regretful", "hopeless", "tragic", "tragedy", "awful", "terrible"
+  ],
+  "anger": [
+    "angry", "anger", "mad", "furious", "fury", "rage", "raging", "annoyed", "annoying", "irritated",
+    "irritating", "frustrated", "frustrating", "hate", "hated", "hateful", "pissed", "outraged",
+    "offended", "resent", "resentful", "jealous", "jealousy", "yell", "yelling", "shout", "shouting",
+    "damn", "hell", "stupid", "idiot", "jerk", "ridiculous"
+  ],
+  "fear": [
+    "afraid", "fear", "fearful", "scared", "scary", "terrified", "terror", "panic", "panicked",
+    "worried", "worry", "worrying", "anxious", "anxiety", "nervous", "nervously", "frightened",
+    "frightening", "horrified", "horror", "dread", "threat", "threatened", "unsafe", "danger",
+    "dangerous", "creepy", "nightmare", "insecure", "uncertain"
+  ],
+  "surprise": [
+    "surprised", "surprise", "surprising", "shocked", "shock", "shocking", "amazed", "amazing",
+    "astonished", "astonishing", "unexpected", "unbelievable", "incredible", "wow", "whoa", "omg",
+    "oh my god", "oh my gosh", "no way", "really", "seriously", "sudden", "suddenly"
+  ],
+  "disgust": [
+    "disgust", "disgusted", "disgusting", "gross", "nasty", "sick", "sickening", "repulsive",
+    "revolting", "awful", "horrible", "terrible", "ew", "eww", "yuck", "vile", "filthy", "dirty",
+    "creepy", "pathetic", "shameful"
+  ],
+  "neutral": [
+    "okay", "ok", "fine", "normal", "alright", "well", "sure", "yeah", "yes", "no", "maybe"
+  ]
+}
