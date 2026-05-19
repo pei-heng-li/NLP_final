@@ -5,7 +5,8 @@ Computes: Macro F1, Weighted F1, Masking Drop, Context Recovery,
 
 Usage:
     python evaluate.py --split test
-    python evaluate.py --split test --conditions T1 T2 M1 M2 B1 B2 B3
+    python evaluate.py --split test --conditions T1 T2 COT DEF FS MCOT MDEF MFS
+    python evaluate.py --split test --results_dir data/llama_1B_instruct
 """
 
 import argparse
@@ -21,15 +22,27 @@ from sklearn.metrics import (
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 EMOTIONS  = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
+<<<<<<< HEAD
 OUT_ROOT  = Path("./results")
 EVAL_ROOT = Path("./eval")
+=======
+OUT_ROOT  = Path("./data/llama_3B_instruct")
+EVAL_ROOT = Path("./data/llama_3B_instruct/eval")
+>>>>>>> 8188fe0 (Add masked prompting text conditions)
 
-ALL_CONDITIONS = ["T1","T2","T3","M1","M2","M3","A1","A2","A3","B1","B2","B3"]
+ALL_CONDITIONS = [
+    "T1","T2","T3",
+    "COT","DEF","FS",
+    "M1","M2","M3",
+    "MCOT","MDEF","MFS",
+    "A1","A2","A3",
+    "B1","B2","B3",
+]
 
 
 # ── Load Results ───────────────────────────────────────────────────────────────
-def load_condition(condition: str, split: str) -> pd.DataFrame | None:
-    path = OUT_ROOT / f"{condition}_{split}.jsonl"
+def load_condition(condition: str, split: str, out_root: Path) -> pd.DataFrame | None:
+    path = out_root / f"{condition}_{split}.jsonl"
     if not path.exists():
         return None
     records = []
@@ -131,19 +144,23 @@ def main():
     parser.add_argument("--split", default="test", choices=["train","dev","test"])
     parser.add_argument("--conditions", nargs="*", default=None,
                         help="Subset of conditions to evaluate; default: all found")
+    parser.add_argument("--results_dir", type=Path, default=OUT_ROOT,
+                        help=f"Directory containing *_{{split}}.jsonl files; default: {OUT_ROOT}")
     args = parser.parse_args()
 
     EVAL_ROOT.mkdir(parents=True, exist_ok=True)
 
     target_conditions = args.conditions if args.conditions else ALL_CONDITIONS
+    out_root = args.results_dir
 
     # ── Load all available results ─────────────────────────────────────────────
     dfs: dict[str, pd.DataFrame] = {}
     results: dict[str, dict]     = {}
 
     print(f"\nLoading results for split: {args.split}")
+    print(f"Results directory: {out_root}")
     for cond in target_conditions:
-        df = load_condition(cond, args.split)
+        df = load_condition(cond, args.split, out_root)
         if df is None:
             print(f"  [SKIP] {cond}: no output file found")
             continue
@@ -183,6 +200,18 @@ def main():
     # Audio Effect: M1 → A2, M2 → A3
     derived["Audio_Gain_M1-A2"]        = masking_drop(results, "A2", "M1")
     derived["Audio_Gain_M2-A3"]        = masking_drop(results, "A3", "M2")
+    # Prompting strategies compared to direct classification with dialogue.
+    derived["Prompt_Gain_T2-COT"]       = masking_drop(results, "COT", "T2")
+    derived["Prompt_Gain_T2-DEF"]       = masking_drop(results, "DEF", "T2")
+    derived["Prompt_Gain_T2-FS"]        = masking_drop(results, "FS", "T2")
+    # Masking effect under the same prompting strategy.
+    derived["Masking_Drop_COT-MCOT"]     = masking_drop(results, "COT", "MCOT")
+    derived["Masking_Drop_DEF-MDEF"]     = masking_drop(results, "DEF", "MDEF")
+    derived["Masking_Drop_FS-MFS"]       = masking_drop(results, "FS", "MFS")
+    # Prompting strategies compared to masked direct classification with dialogue.
+    derived["Prompt_Gain_M2-MCOT"]       = masking_drop(results, "MCOT", "M2")
+    derived["Prompt_Gain_M2-MDEF"]       = masking_drop(results, "MDEF", "M2")
+    derived["Prompt_Gain_M2-MFS"]        = masking_drop(results, "MFS", "M2")
 
     for k, v in derived.items():
         print(f"  {k:<35} = {v}")
@@ -196,7 +225,12 @@ def main():
     print('='*70)
 
     pairs = [("T1","M1"), ("T2","M2"), ("T3","M3"),
-             ("T1","T2"), ("T1","T3"), ("M1","A2")]
+             ("T1","T2"), ("T1","T3"), ("M1","A2"),
+             ("T2","COT"), ("T2","DEF"), ("T2","FS"),
+             ("COT","DEF"), ("COT","FS"), ("DEF","FS"),
+             ("COT","MCOT"), ("DEF","MDEF"), ("FS","MFS"),
+             ("M2","MCOT"), ("M2","MDEF"), ("M2","MFS"),
+             ("MCOT","MDEF"), ("MCOT","MFS"), ("MDEF","MFS")]
     change_rates = {}
     for a, b in pairs:
         if a in dfs and b in dfs:
