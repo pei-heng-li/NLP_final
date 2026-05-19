@@ -21,8 +21,8 @@ from sklearn.metrics import (
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 EMOTIONS  = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
-OUT_ROOT  = Path("/tmp2/b11902128/NLP/results")
-EVAL_ROOT = Path("/tmp2/b11902128/NLP/eval")
+OUT_ROOT  = Path("./results")
+EVAL_ROOT = Path("./eval")
 
 ALL_CONDITIONS = ["T1","T2","T3","M1","M2","M3","A1","A2","A3","B1","B2","B3"]
 

@@ -1,9 +1,0 @@
-{
-  "Masking_Drop_T1-M1": 0.0712,
-  "Context_Recovery_M1-M2": -0.0361,
-  "Context_Recovery_M1-M3": -0.0303,
-  "Context_Gain_T1-T2": -0.0784,
-  "Context_Gain_T1-T3": -0.0725,
-  "Audio_Gain_M1-A2": -0.1028,
-  "Audio_Gain_M2-A3": -0.0583
-}

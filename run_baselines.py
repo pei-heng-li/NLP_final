@@ -24,9 +24,9 @@ from transformers import (
 EMOTIONS   = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
 ID2LABEL   = {i: e for i, e in enumerate(EMOTIONS)}
 LABEL2ID   = {e: i for i, e in enumerate(EMOTIONS)}
-DATA_ROOT  = Path("/tmp2/b11902128/NLP/MELD.Raw")
-OUT_ROOT   = Path("/tmp2/b11902128/NLP/results")
-MODEL_DIR  = Path("/tmp2/b11902128/NLP/roberta_meld")
+DATA_ROOT  = Path("./MELD.Raw")
+OUT_ROOT   = Path("./results")
+MODEL_DIR  = Path("./roberta_meld")
 LEXICON_PATH = Path(__file__).parent / "emotion_lexicon.json"
 
 # B2 keyword → emotion (loaded from shared lexicon, multi-word phrases skipped)
