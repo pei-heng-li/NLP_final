@@ -23,10 +23,12 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 EMOTIONS     = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
 EMOTION_SET  = set(EMOTIONS)
 EMOTION_OPTS = ", ".join(EMOTIONS)
-MODEL_ID     = "meta-llama/Llama-3.2-1B-Instruct"
-DATA_ROOT    = Path("/tmp2/b11902128/NLP/MELD.Raw")
-OUT_ROOT     = Path("/tmp2/b11902128/NLP/results")
-FEAT_CACHE   = Path("/tmp2/b11902128/NLP/audio_features")
+# MODEL_ID     = "meta-llama/Llama-3.2-1B-Instruct"
+MODEL_ID     = "meta-llama/Llama-3.2-3B-Instruct"
+# MODEL_ID     = "meta-llama/Llama-3.1-8B-Instruct"
+DATA_ROOT    = Path("./MELD.Raw")
+OUT_ROOT     = Path("./results")
+FEAT_CACHE   = Path("./audio_features")
 
 # Audio split dirs per data split
 AUDIO_DIRS = {

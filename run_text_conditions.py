@@ -17,9 +17,11 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 # ── Constants ──────────────────────────────────────────────────────────────────
 EMOTIONS = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
 EMOTION_SET = set(EMOTIONS)
-MODEL_ID = "meta-llama/Llama-3.2-1B-Instruct"
-DATA_ROOT = Path("/tmp2/b11902128/NLP/MELD.Raw")
-OUT_ROOT  = Path("/tmp2/b11902128/NLP/results")
+# MODEL_ID = "meta-llama/Llama-3.2-1B-Instruct"
+MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
+# MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
+DATA_ROOT = Path("./MELD.Raw")
+OUT_ROOT  = Path("./results")
 
 # Emotion keywords: loaded from emotion_lexicon.json (same directory as this script)
 LEXICON_PATH = Path(__file__).parent / "emotion_lexicon.json"
