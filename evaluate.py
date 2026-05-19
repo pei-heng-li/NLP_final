@@ -22,13 +22,9 @@ from sklearn.metrics import (
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 EMOTIONS  = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
-<<<<<<< HEAD
+
 OUT_ROOT  = Path("./results")
 EVAL_ROOT = Path("./eval")
-=======
-OUT_ROOT  = Path("./data/llama_3B_instruct")
-EVAL_ROOT = Path("./data/llama_3B_instruct/eval")
->>>>>>> 8188fe0 (Add masked prompting text conditions)
 
 ALL_CONDITIONS = [
     "T1","T2","T3",
