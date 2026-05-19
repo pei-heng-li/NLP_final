@@ -113,7 +113,7 @@ def build_context(df: pd.DataFrame, dia_id: int, utt_id: int,
 # ── Prompt Builders ────────────────────────────────────────────────────────────
 EMOTION_OPTS = ", ".join(EMOTIONS)
 
-def prompt_T1(utterance: str) -> str:
+def prompt_T1(speaker: str,utterance: str) -> str:
     return (
         "This is a single-choice question.\n\n"
         "You will be given a target utterance from a conversation.\n"
@@ -123,7 +123,7 @@ def prompt_T1(utterance: str) -> str:
         "Answer with only one label."
     )
 
-def prompt_T2(utterance: str, context: str) -> str:
+def prompt_T2(speaker: str,utterance: str, context: str) -> str:
     ctx_block = f"Conversation:\n{context}\n\n" if context else ""
     return (
         "This is a single-choice question.\n\n"
