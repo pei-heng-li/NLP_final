@@ -2,7 +2,7 @@
 wget https://huggingface.co/datasets/declare-lab/MELD/resolve/main/MELD.Raw.tar.gz
 tar -xvf MELD.Raw.tar.gz
 
-cd /tmp2/b11902128/MELD.Raw
+cd MELD.Raw
 tar -xzf dev.tar.gz
 tar -xzf test.tar.gz
 tar -xzf train.tar.gz
