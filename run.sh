@@ -15,3 +15,5 @@ conda activate nlp
 
 pip install pandas
 pip install transformers accelerate torch
+
+pip install git+https://github.com/huggingface/transformers

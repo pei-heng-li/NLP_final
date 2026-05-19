@@ -24,7 +24,7 @@ EMOTIONS  = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"
 OUT_ROOT  = Path("./results")
 EVAL_ROOT = Path("./eval")
 
-ALL_CONDITIONS = ["T1","T2","T3","M1","M2","M3","A1","A2","A3","B1","B2","B3"]
+ALL_CONDITIONS = ["T1","T2","T3","M1","M2","M3","A1","A2","A3","A1_mllm","A2_mllm","A3_mllm","B1","B2","B3"]
 
 
 # ── Load Results ───────────────────────────────────────────────────────────────
@@ -183,6 +183,11 @@ def main():
     # Audio Effect: M1 → A2, M2 → A3
     derived["Audio_Gain_M1-A2"]        = masking_drop(results, "A2", "M1")
     derived["Audio_Gain_M2-A3"]        = masking_drop(results, "A3", "M2")
+    derived["Audio_Gain_M1-A2_mllm"]   = masking_drop(results, "A2_mllm", "M1")
+    derived["Audio_Gain_M2-A3_mllm"]   = masking_drop(results, "A3_mllm", "M2")
+    derived["MLLM_vs_Text_A1"]         = masking_drop(results, "A1_mllm", "A1")
+    derived["MLLM_vs_Text_A2"]         = masking_drop(results, "A2_mllm", "A2")
+    derived["MLLM_vs_Text_A3"]         = masking_drop(results, "A3_mllm", "A3")
 
     for k, v in derived.items():
         print(f"  {k:<35} = {v}")
@@ -196,7 +201,8 @@ def main():
     print('='*70)
 
     pairs = [("T1","M1"), ("T2","M2"), ("T3","M3"),
-             ("T1","T2"), ("T1","T3"), ("M1","A2")]
+             ("T1","T2"), ("T1","T3"), ("M1","A2"), ("M1","A2_mllm"),
+             ("A1","A1_mllm"), ("A2","A2_mllm"), ("A3","A3_mllm")]
     change_rates = {}
     for a, b in pairs:
         if a in dfs and b in dfs:

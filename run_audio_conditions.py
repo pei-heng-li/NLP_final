@@ -23,9 +23,10 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 EMOTIONS     = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
 EMOTION_SET  = set(EMOTIONS)
 EMOTION_OPTS = ", ".join(EMOTIONS)
-MODEL_ID     = "meta-llama/Llama-3.2-1B-Instruct"
+# MODEL_ID     = "meta-llama/Llama-3.2-1B-Instruct"
 # MODEL_ID     = "meta-llama/Llama-3.2-3B-Instruct"
 # MODEL_ID     = "meta-llama/Llama-3.1-8B-Instruct"
+MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
 DATA_ROOT    = Path("./MELD.Raw")
 OUT_ROOT     = Path("./results")
 FEAT_CACHE   = Path("./audio_features")

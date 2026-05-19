@@ -38,14 +38,19 @@ echo ""
 echo "[Stage 3] Audio conditions: A1, A2, A3 ..."
 run_py "$SCRIPTS_DIR/run_audio_conditions.py" --conditions A1 A2 A3 --split "$SPLIT" --batch_size 16 --max_new_tokens 16
 
-# ── Stage 4: Baselines ────────────────────────────────────────
+# ── Stage 4: Audio conditions A1_mllm / A2_mllm / A3_mllm ───────────────────
 echo ""
-echo "[Stage 4] Baselines: B1, B2, B3 ..."
+echo "[Stage 4] Audio conditions: A1_mllm, A2_mllm, A3_mllm ..."
+python run_audio_mllm.py --conditions A1_mllm A2_mllm A3_mllm --split "$SPLIT"
+
+# ── Stage 5: Baselines ────────────────────────────────────────
+echo ""
+echo "[Stage 5] Baselines: B1, B2, B3 ..."
 run_py "$SCRIPTS_DIR/run_baselines.py" --baselines B1 B2 B3 --split "$SPLIT"
 
-# ── Stage 5: Evaluation ───────────────────────────────────────
+# ── Stage 6: Evaluation ───────────────────────────────────────
 echo ""
-echo "[Stage 5] Unified evaluation ..."
+echo "[Stage 6] Unified evaluation ..."
 run_py "$SCRIPTS_DIR/evaluate.py" --split "$SPLIT"
 
 echo ""
