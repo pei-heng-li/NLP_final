@@ -18,14 +18,9 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 # ── Constants ──────────────────────────────────────────────────────────────────
 EMOTIONS = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
 EMOTION_SET = set(EMOTIONS)
-<<<<<<< HEAD
-MODEL_ID = "meta-llama/Llama-3.2-1B-Instruct"
-# MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
-=======
 TEXT_CONDITIONS = ["T1","T2","T3","M1","M2","M3","COT","DEF","FS","MCOT","MDEF","MFS"]
 # MODEL_ID = "meta-llama/Llama-3.2-1B-Instruct"
 MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
->>>>>>> 8188fe0 (Add masked prompting text conditions)
 # MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
 DATA_ROOT = Path("./MELD.Raw")
 OUT_ROOT  = Path(f"./data/llama_3B_instruct")  # separate folder per model to avoid overwriting results
@@ -120,13 +115,6 @@ def build_context(df: pd.DataFrame, dia_id: int, utt_id: int,
 # ── Prompt Builders ────────────────────────────────────────────────────────────
 EMOTION_OPTS = ", ".join(EMOTIONS)
 
-<<<<<<< HEAD
-def prompt_T1(speaker: str,utterance: str) -> str:
-    return (
-        "This is a single-choice question.\n\n"
-        "You will be given a target utterance from a conversation.\n"
-        "Your task is to determine the emotion of the target utterance.\n\n"
-=======
 EMOTION_DEFINITIONS = {
     "surprise": "unexpectedness, shock, or sudden realization.",
     "anger": "irritation, frustration, resentment, or hostility.",
@@ -193,7 +181,6 @@ def prompt_T1(speaker: str, utterance: str) -> str:
         "This is a single-choice question.\n\n"
         "You will be given a target utterance from a conversation.\n"
         "Your task is to determine the emotion of the speaker when they said the target utterance.\n\n"
->>>>>>> 8188fe0 (Add masked prompting text conditions)
         f'Target utterance: "{utterance}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Answer with only one label."
@@ -230,11 +217,7 @@ def prompt_M1(speaker: str, masked_utt: str) -> str:
         "This is a single-choice question.\n\n"
         "You will be given a target utterance from a conversation.\n"
         "Some emotion-bearing words have been replaced with [MASK].\n"
-<<<<<<< HEAD
         "Your task is to determine the emotion of the target utterance.\n\n"
-=======
-        "Your task is to determine the emotion of the speaker when they said the target utterance.\n\n"
->>>>>>> 8188fe0 (Add masked prompting text conditions)
         f'Target utterance: "{masked_utt}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Answer with only one label."
