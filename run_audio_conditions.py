@@ -23,8 +23,8 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 EMOTIONS     = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
 EMOTION_SET  = set(EMOTIONS)
 EMOTION_OPTS = ", ".join(EMOTIONS)
-# MODEL_ID     = "meta-llama/Llama-3.2-1B-Instruct"
-MODEL_ID     = "meta-llama/Llama-3.2-3B-Instruct"
+MODEL_ID     = "meta-llama/Llama-3.2-1B-Instruct"
+# MODEL_ID     = "meta-llama/Llama-3.2-3B-Instruct"
 # MODEL_ID     = "meta-llama/Llama-3.1-8B-Instruct"
 DATA_ROOT    = Path("./MELD.Raw")
 OUT_ROOT     = Path("./results")
@@ -263,8 +263,7 @@ def prompt_A1(speaker: str, audio_desc: str) -> str:
     return (
         "This is a single-choice question.\n\n"
         "You will be given acoustic features of a spoken utterance.\n"
-        "Your task is to determine the emotion of the target speaker based on the audio information.\n\n"
-        f"Target speaker: {speaker}\n"
+        "Your task is to determine the emotion of the audio information.\n\n"
         f"Audio description: {audio_desc}\n\n"
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Answer with only one label."
@@ -275,8 +274,8 @@ def prompt_A2(speaker: str, masked_utt: str, audio_desc: str) -> str:
         "This is a single-choice question.\n\n"
         "You will be given a masked utterance and acoustic features of a spoken utterance.\n"
         "Some emotion-bearing words in the utterance have been replaced with [MASK].\n"
-        "Your task is to determine the emotion of the target speaker.\n\n"
-        f"Target speaker: {speaker}\n"
+        "Your task is to determine the emotion of the audio information.\n\n"
+
         f'Masked utterance: "{masked_utt}"\n'
         f"Audio description: {audio_desc}\n\n"
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
@@ -289,9 +288,9 @@ def prompt_A3(speaker: str, masked_utt: str, audio_desc: str, context: str) -> s
         "This is a single-choice question.\n\n"
         "You will be given a conversation, a masked utterance, and acoustic features.\n"
         "Some emotion-bearing words in the target utterance have been replaced with [MASK].\n"
-        "Your task is to determine the emotion of the target speaker.\n\n"
+        "Your task is to determine the emotion of the audio information.\n\n"
         f"{ctx_block}"
-        f"Target speaker: {speaker}\n"
+
         f'Masked utterance: "{masked_utt}"\n'
         f"Audio description: {audio_desc}\n\n"
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"

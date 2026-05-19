@@ -17,8 +17,8 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 # ── Constants ──────────────────────────────────────────────────────────────────
 EMOTIONS = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
 EMOTION_SET = set(EMOTIONS)
-# MODEL_ID = "meta-llama/Llama-3.2-1B-Instruct"
-MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
+MODEL_ID = "meta-llama/Llama-3.2-1B-Instruct"
+# MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
 # MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
 DATA_ROOT = Path("./MELD.Raw")
 OUT_ROOT  = Path("./results")
@@ -113,25 +113,23 @@ def build_context(df: pd.DataFrame, dia_id: int, utt_id: int,
 # ── Prompt Builders ────────────────────────────────────────────────────────────
 EMOTION_OPTS = ", ".join(EMOTIONS)
 
-def prompt_T1(speaker: str, utterance: str) -> str:
+def prompt_T1(utterance: str) -> str:
     return (
         "This is a single-choice question.\n\n"
         "You will be given a target utterance from a conversation.\n"
-        "Your task is to determine the emotion of the speaker when they said the target utterance.\n\n"
-        f"Target speaker: {speaker}\n"
+        "Your task is to determine the emotion of the target utterance.\n\n"
         f'Target utterance: "{utterance}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Answer with only one label."
     )
 
-def prompt_T2(speaker: str, utterance: str, context: str) -> str:
+def prompt_T2(utterance: str, context: str) -> str:
     ctx_block = f"Conversation:\n{context}\n\n" if context else ""
     return (
         "This is a single-choice question.\n\n"
         "You will be given a conversation and a target utterance.\n"
-        "Your task is to determine the emotion of the target speaker when they said the target utterance.\n\n"
+        "Your task is to determine the emotion of the target utterance.\n\n"
         f"{ctx_block}"
-        f"Target speaker: {speaker}\n"
         f'Target utterance: "{utterance}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Answer with only one label."
@@ -156,8 +154,7 @@ def prompt_M1(speaker: str, masked_utt: str) -> str:
         "This is a single-choice question.\n\n"
         "You will be given a target utterance from a conversation.\n"
         "Some emotion-bearing words have been replaced with [MASK].\n"
-        "Your task is to determine the emotion of the speaker when they said the target utterance.\n\n"
-        f"Target speaker: {speaker}\n"
+        "Your task is to determine the emotion of the target utterance.\n\n"
         f'Target utterance: "{masked_utt}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Answer with only one label."
@@ -169,9 +166,8 @@ def prompt_M2(speaker: str, masked_utt: str, context: str) -> str:
         "This is a single-choice question.\n\n"
         "You will be given a conversation and a target utterance.\n"
         "Some emotion-bearing words in the target utterance have been replaced with [MASK].\n"
-        "Your task is to determine the emotion of the target speaker when they said the target utterance.\n\n"
+        "Your task is to determine the emotion of the target utterance.\n\n"
         f"{ctx_block}"
-        f"Target speaker: {speaker}\n"
         f'Target utterance: "{masked_utt}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Answer with only one label."
