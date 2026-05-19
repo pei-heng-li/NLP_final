@@ -1,8 +1,9 @@
 """
-MELD ERC Experiment: Text Conditions (T1, T2, T3, M1, M2, M3)
-Run on meow2 under /tmp2/b11902128/NLP/
+MELD ERC Experiment: Text Conditions (T1, T2, T3, M1, M2, M3, COT, DEF, FS, MCOT, MDEF, MFS)
+
 Usage:
-    python run_text_conditions.py --conditions T1 T2 T3 M1 M2 M3 --split test
+    python run_text_conditions.py --conditions T1 T2 T3 M1 M2 M3 COT DEF FS MCOT MDEF MFS --split test
+    python run_text_conditions.py --conditions FS MCOT MDEF MFS --split test
 """
 
 import argparse
@@ -17,12 +18,13 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 # ── Constants ──────────────────────────────────────────────────────────────────
 EMOTIONS = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
 EMOTION_SET = set(EMOTIONS)
+TEXT_CONDITIONS = ["T1","T2","T3","M1","M2","M3","COT","DEF","FS","MCOT","MDEF","MFS"]
 # MODEL_ID = "meta-llama/Llama-3.2-1B-Instruct"
-# MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
+MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
 # MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
 MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
 DATA_ROOT = Path("./MELD.Raw")
-OUT_ROOT  = Path("./results")
+OUT_ROOT  = Path(f"./data/llama_3B_instruct")  # separate folder per model to avoid overwriting results
 
 # Emotion keywords: loaded from emotion_lexicon.json (same directory as this script)
 LEXICON_PATH = Path(__file__).parent / "emotion_lexicon.json"
@@ -114,11 +116,72 @@ def build_context(df: pd.DataFrame, dia_id: int, utt_id: int,
 # ── Prompt Builders ────────────────────────────────────────────────────────────
 EMOTION_OPTS = ", ".join(EMOTIONS)
 
-def prompt_T1(speaker: str,utterance: str) -> str:
+EMOTION_DEFINITIONS = {
+    "surprise": "unexpectedness, shock, or sudden realization.",
+    "anger": "irritation, frustration, resentment, or hostility.",
+    "neutral": "no clear emotional charge, or a factual/calm statement.",
+    "joy": "happiness, amusement, pleasure, affection, or excitement.",
+    "sadness": "unhappiness, disappointment, grief, or regret.",
+    "fear": "anxiety, worry, nervousness, threat, or panic.",
+    "disgust": "revulsion, dislike, contempt, or being grossed out.",
+}
+
+FEW_SHOT_EXAMPLES = [
+    {
+        "target_utterance": "Oh my god, I can't believe you're here!",
+        "answer": "surprise",
+    },
+    {
+        "target_utterance": "I told you not to touch my things.",
+        "answer": "anger",
+    },
+    {
+        "target_utterance": "I have a meeting at three.",
+        "answer": "neutral",
+    },
+    {
+        "target_utterance": "This is the best sandwich I've ever had!",
+        "answer": "joy",
+    },
+    {
+        "target_utterance": "I really miss her today.",
+        "answer": "sadness",
+    },
+    {
+        "target_utterance": "I don't know if I can go in there.",
+        "answer": "fear",
+    },
+    {
+        "target_utterance": "That smell is absolutely awful.",
+        "answer": "disgust",
+    },
+]
+
+
+def format_definitions() -> str:
+    return "\n".join(
+        f"- {emotion}: {definition}"
+        for emotion, definition in EMOTION_DEFINITIONS.items()
+    )
+
+
+def format_few_shot_examples() -> str:
+    return json.dumps(FEW_SHOT_EXAMPLES, ensure_ascii=False, indent=2)
+
+
+def format_input_json(utterance: str, context: str | None = None) -> str:
+    payload = {
+        "conversation_context": context or "",
+        "target_utterance": utterance,
+        "emotion_options": EMOTIONS,
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+def prompt_T1(speaker: str, utterance: str) -> str:
     return (
         "This is a single-choice question.\n\n"
         "You will be given a target utterance from a conversation.\n"
-        "Your task is to determine the emotion of the target utterance.\n\n"
+        "Your task is to determine the emotion of the speaker when they said the target utterance.\n\n"
         f'Target utterance: "{utterance}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Answer with only one label."
@@ -189,6 +252,83 @@ def prompt_M3(speaker: str, masked_utt: str, context: str) -> str:
         "Answer with only one label."
     )
 
+def prompt_COT(speaker: str, utterance: str, context: str) -> str:
+    return (
+        "This is a single-choice question.\n\n"
+        "You will be given a conversation and a target utterance.\n"
+        "Your task is to determine the emotion of the target speaker when they said the target utterance.\n\n"
+        f'Target utterance: "{utterance}"\n\n'
+        f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
+        "Reason step by step, then put the final label on the last line in this exact format:\n"
+        "Final answer: <label>"
+    )
+
+def prompt_DEF(speaker: str, utterance: str, context: str) -> str:
+    return (
+        "This is a single-choice question.\n\n"
+        "You will be given a conversation and a target utterance.\n"
+        "Use the emotion definitions below to determine the emotion of the target speaker.\n\n"
+        "Emotion definitions:\n"
+        f"{format_definitions()}\n\n"
+        f'Target utterance: "{utterance}"\n\n'
+        f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
+        "Answer with only one label."
+    )
+
+def prompt_FS(speaker: str, utterance: str, context: str) -> str:
+    return (
+        "This is a single-choice question.\n\n"
+        "You will be given JSON examples, then a new JSON input.\n"
+        "Each example contains a target_utterance and its gold emotion label.\n"
+        "Classify the target utterance in the input using the same label style.\n\n"
+        "Examples JSON:\n"
+        f"{format_few_shot_examples()}\n\n"
+        "Input JSON:\n"
+        f"{format_input_json(utterance, context)}\n\n"
+        "Answer with only one label."
+    )
+
+def prompt_MCOT(speaker: str, masked_utt: str, context: str) -> str:
+    ctx_block = f"Conversation:\n{context}\n\n" if context else ""
+    return (
+        "This is a single-choice question.\n\n"
+        "You will be given a conversation and a target utterance.\n"
+        "Some emotion-bearing words in the target utterance have been replaced with [MASK].\n"
+        "Your task is to determine the emotion of the target speaker when they said the target utterance.\n\n"
+        f'Target utterance: "{masked_utt}"\n\n'
+        f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
+        "Reason step by step, then put the final label on the last line in this exact format:\n"
+        "Final answer: <label>"
+    )
+
+def prompt_MDEF(speaker: str, masked_utt: str, context: str) -> str:
+    ctx_block = f"Conversation:\n{context}\n\n" if context else ""
+    return (
+        "This is a single-choice question.\n\n"
+        "You will be given a conversation and a target utterance.\n"
+        "Some emotion-bearing words in the target utterance have been replaced with [MASK].\n"
+        "Use the emotion definitions below to determine the emotion of the target speaker.\n\n"
+        "Emotion definitions:\n"
+        f"{format_definitions()}\n\n"
+        f'Target utterance: "{masked_utt}"\n\n'
+        f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
+        "Answer with only one label."
+    )
+
+def prompt_MFS(speaker: str, masked_utt: str, context: str) -> str:
+    return (
+        "This is a single-choice question.\n\n"
+        "You will be given JSON examples, then a new JSON input.\n"
+        "Each example contains a target_utterance and its gold emotion label.\n"
+        "In the input, some emotion-bearing words in the target_utterance may have been replaced with [MASK].\n"
+        "Classify the target utterance in the input using the same label style.\n\n"
+        "Examples JSON:\n"
+        f"{format_few_shot_examples()}\n\n"
+        "Input JSON:\n"
+        f"{format_input_json(masked_utt, context)}\n\n"
+        "Answer with only one label."
+    )
+
 
 # ── Build prompt for a row ─────────────────────────────────────────────────────
 def build_prompt(condition: str, row: pd.Series, df: pd.DataFrame) -> tuple[str, dict]:
@@ -221,6 +361,30 @@ def build_prompt(condition: str, row: pd.Series, df: pd.DataFrame) -> tuple[str,
         ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
         prompt = prompt_M3(speaker, masked, ctx)
         meta   = {"context": ctx, "masked_utterance": masked}
+    elif condition == "COT":
+        ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
+        prompt = prompt_COT(speaker, utt, ctx)
+        meta   = {"context": ctx, "masked_utterance": None}
+    elif condition == "DEF":
+        ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
+        prompt = prompt_DEF(speaker, utt, ctx)
+        meta   = {"context": ctx, "masked_utterance": None}
+    elif condition == "FS":
+        ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
+        prompt = prompt_FS(speaker, utt, ctx)
+        meta   = {"context": ctx, "masked_utterance": None}
+    elif condition == "MCOT":
+        ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
+        prompt = prompt_MCOT(speaker, masked, ctx)
+        meta   = {"context": ctx, "masked_utterance": masked}
+    elif condition == "MDEF":
+        ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
+        prompt = prompt_MDEF(speaker, masked, ctx)
+        meta   = {"context": ctx, "masked_utterance": masked}
+    elif condition == "MFS":
+        ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
+        prompt = prompt_MFS(speaker, masked, ctx)
+        meta   = {"context": ctx, "masked_utterance": masked}
     else:
         raise ValueError(f"Unknown condition: {condition}")
     return prompt, meta
@@ -230,9 +394,17 @@ def build_prompt(condition: str, row: pd.Series, df: pd.DataFrame) -> tuple[str,
 def parse_prediction(text: str) -> str:
     """Extract the first valid emotion label from model output."""
     text_lower = text.strip().lower()
+    final_match = re.search(r"final\s+answer\s*:\s*([a-z]+)", text_lower)
+    if final_match and final_match.group(1) in EMOTION_SET:
+        return final_match.group(1)
+    answer_match = re.search(r"\banswer\s*:\s*([a-z]+)", text_lower)
+    if answer_match and answer_match.group(1) in EMOTION_SET:
+        return answer_match.group(1)
     # Try exact match on first word/line
     for line in text_lower.splitlines():
         line = line.strip().rstrip(".")
+        if line.startswith("final answer:"):
+            line = line.split(":", 1)[1].strip().rstrip(".")
         if line in EMOTION_SET:
             return line
     # Fallback: find first emotion keyword anywhere
@@ -297,8 +469,8 @@ def run_inference(tokenizer, model, prompts: list[str],
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--conditions", nargs="+",
-                        default=["T1","T2","T3","M1","M2","M3"],
-                        choices=["T1","T2","T3","M1","M2","M3"])
+                        default=TEXT_CONDITIONS,
+                        choices=TEXT_CONDITIONS)
     parser.add_argument("--split", default="test", choices=["train","dev","test"])
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--max_new_tokens", type=int, default=16)
@@ -321,7 +493,7 @@ def main():
         print(f"{'='*60}")
 
         out_path = OUT_ROOT / f"{cond}_{args.split}.jsonl"
-        if out_path.exists():
+        if out_path.exists() and not args.overwrite and not args.dry_run:
             print(f"  Output already exists: {out_path}. Skipping.")
             continue
 
@@ -339,10 +511,14 @@ def main():
             continue
 
         # Inference
+        max_new_tokens = args.max_new_tokens
+        if cond in {"COT", "MCOT"} and max_new_tokens < 96:
+            max_new_tokens = 96
+            print(f"  {cond} condition: using max_new_tokens=96 so the final answer is not truncated.")
         raw_outputs = run_inference(
             tokenizer, model, prompts,
             batch_size=args.batch_size,
-            max_new_tokens=args.max_new_tokens,
+            max_new_tokens=max_new_tokens,
         )
 
         # Parse and save
