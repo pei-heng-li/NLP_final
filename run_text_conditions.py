@@ -14,17 +14,19 @@ import pandas as pd
 import torch
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+from transformers import AutoProcessor, Qwen2AudioForConditionalGeneration
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 EMOTIONS = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
 EMOTION_SET = set(EMOTIONS)
 TEXT_CONDITIONS = ["T1","T2","T3","M1","M2","M3","COT","DEF","FS","MCOT","MDEF","MFS"]
 # MODEL_ID = "meta-llama/Llama-3.2-1B-Instruct"
-MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
+# MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
 # MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
-MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
+# MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
+MODEL_ID     = "Qwen/Qwen2-Audio-7B-Instruct"
 DATA_ROOT = Path("./MELD.Raw")
-OUT_ROOT  = Path(f"./data/llama_3B_instruct")  # separate folder per model to avoid overwriting results
+OUT_ROOT  = Path(f"./results")  # separate folder per model to avoid overwriting results
 
 # Emotion keywords: loaded from emotion_lexicon.json (same directory as this script)
 LEXICON_PATH = Path(__file__).parent / "emotion_lexicon.json"
@@ -417,52 +419,78 @@ def parse_prediction(text: str) -> str:
 # ── Model Inference ────────────────────────────────────────────────────────────
 def load_model():
     print(f"Loading model: {MODEL_ID}")
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
-    # Fix: set pad_token so batched pipeline works
-    if tokenizer.pad_token_id is None:
-        tokenizer.pad_token_id = tokenizer.eos_token_id
-    model = AutoModelForCausalLM.from_pretrained(
-        MODEL_ID,
-        dtype=torch.bfloat16,
-        device_map="auto",
-    )
+    if "qwen2-audio" in MODEL_ID.lower():
+        processor = AutoProcessor.from_pretrained(MODEL_ID)
+        tokenizer = processor.tokenizer
+        if tokenizer.pad_token_id is None:
+            tokenizer.pad_token_id = tokenizer.eos_token_id
+        model = Qwen2AudioForConditionalGeneration.from_pretrained(
+            MODEL_ID, dtype=torch.bfloat16, device_map="auto"
+        )
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+        if tokenizer.pad_token_id is None:
+            tokenizer.pad_token_id = tokenizer.eos_token_id
+        model = AutoModelForCausalLM.from_pretrained(
+            MODEL_ID, dtype=torch.bfloat16, device_map="auto"
+        )
     model.eval()
     return tokenizer, model
 
 
-def run_inference(tokenizer, model, prompts: list[str],
-                  batch_size: int = 16, max_new_tokens: int = 16) -> list[str]:
-    """Run batched inference; returns list of generated-only strings."""
-    pipe = pipeline(
-        "text-generation",
-        model=model,
-        tokenizer=tokenizer,
-        max_new_tokens=max_new_tokens,
-        do_sample=False,
-        batch_size=batch_size,
-        return_full_text=False,   # return generated tokens only, not the prompt
-    )
-
-    results = []
-    total = len(prompts)
-    for i in range(0, total, batch_size):
-        batch = prompts[i : i + batch_size]
-        # Format as chat messages
-        chat_prompts = [
-            tokenizer.apply_chat_template(
-                [{"role": "user", "content": p}],
-                tokenize=False,
-                add_generation_prompt=True,
+def run_inference(tokenizer, model, prompts, batch_size=16, max_new_tokens=16):
+    if "qwen2-audio" in MODEL_ID.lower():
+        # Qwen2-Audio text-only: 直接 tokenize + generate，不走 pipeline
+        results = []
+        total = len(prompts)
+        for i in range(0, total, batch_size):
+            batch = prompts[i : i + batch_size]
+            chat_prompts = [
+                tokenizer.apply_chat_template(
+                    [{"role": "user", "content": p}],
+                    tokenize=False, add_generation_prompt=True,
+                )
+                for p in batch
+            ]
+            enc = tokenizer(chat_prompts, return_tensors="pt",
+                            padding=True, truncation=True).to(model.device)
+            with torch.no_grad():
+                out = model.generate(
+                    **enc, max_new_tokens=max_new_tokens, do_sample=False
+                )
+            input_len = enc["input_ids"].shape[1]
+            decoded = tokenizer.batch_decode(
+                out[:, input_len:], skip_special_tokens=True
             )
-            for p in batch
-        ]
-        outputs = pipe(chat_prompts)
-        for out in outputs:
-            generated = out[0]["generated_text"]
-            results.append(generated if isinstance(generated, str) else str(generated))
-        print(f"  [{min(i+batch_size, total)}/{total}] done", end="\r")
-    print()
-    return results
+            results.extend([d.strip() for d in decoded])
+            print(f"  [{min(i+batch_size, total)}/{total}] done", end="\r")
+        print()
+        return results
+    else:
+        # 原本的 pipeline 路徑不變
+        pipe = pipeline(
+            "text-generation", model=model, tokenizer=tokenizer,
+            max_new_tokens=max_new_tokens, do_sample=False,
+            batch_size=batch_size, return_full_text=False,
+        )
+        results = []
+        total = len(prompts)
+        for i in range(0, total, batch_size):
+            batch = prompts[i : i + batch_size]
+            chat_prompts = [
+                tokenizer.apply_chat_template(
+                    [{"role": "user", "content": p}],
+                    tokenize=False, add_generation_prompt=True,
+                )
+                for p in batch
+            ]
+            outputs = pipe(chat_prompts)
+            for out in outputs:
+                generated = out[0]["generated_text"]
+                results.append(generated if isinstance(generated, str) else str(generated))
+            print(f"  [{min(i+batch_size, total)}/{total}] done", end="\r")
+        print()
+        return results
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -476,6 +504,8 @@ def main():
     parser.add_argument("--max_new_tokens", type=int, default=16)
     parser.add_argument("--dry_run", action="store_true",
                         help="Print 3 sample prompts per condition without running model")
+    parser.add_argument("--overwrite", action="store_true",
+                    help="Overwrite existing output files")
     args = parser.parse_args()
 
     OUT_ROOT.mkdir(parents=True, exist_ok=True)

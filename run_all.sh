@@ -17,7 +17,6 @@ echo "========================================================"
 echo " MELD ERC Experiment Pipeline"
 echo " Split: $SPLIT"
 echo "========================================================"
-export CUDA_VISIBLE_DEVICES=1
 # ── Stage 0: Dry-run sanity check ────────────────────────────
 echo ""
 echo "[Stage 0] Dry-run sanity check (T1, M1) ..."
@@ -55,6 +54,6 @@ run_py "$SCRIPTS_DIR/evaluate.py" --split "$SPLIT"
 
 echo ""
 echo "========================================================"
-echo " Done! Results in /tmp2/b11902128/NLP/results/"
-echo " Eval   in /tmp2/b11902128/NLP/eval/"
+echo " Done! Results in ./NLP/results/"
+echo " Eval   in ./NLP/eval/"
 echo "========================================================"

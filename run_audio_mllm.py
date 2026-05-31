@@ -123,12 +123,12 @@ def build_context(df: pd.DataFrame, dia_id: int, utt_id: int) -> str:
 # Qwen2-Audio content format: list of {"type": "audio", "audio": np.ndarray}
 # and {"type": "text", "text": "..."} items.
 
-def build_conversation_A1(audio: np.ndarray) -> list[dict]:
-    """A1: audio only. Prompt mirrors T1 format."""
+def build_conversation_A1(utt: str, audio: np.ndarray) -> list[dict]:
     text = (
         "This is a single-choice question.\n\n"
         "You will hear a spoken utterance.\n"
         "Your task is to determine the emotion of the speaker when they said the utterance.\n\n"
+        f'Target utterance: "{utt}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Answer with only one label."
     )
@@ -183,6 +183,7 @@ def build_conversation_no_audio(condition: str, masked_utt: str,
             "This is a single-choice question.\n\n"
             "Audio information is unavailable for this utterance.\n"
             "Your task is to determine the emotion of the speaker.\n\n"
+            f'Target utterance: "{masked_utt}"\n\n'
             f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
             "Answer with only one label."
         )
@@ -476,7 +477,7 @@ def main():
             base = cond.split("_")[0]   # "A1" / "A2" / "A3"
             if has_audio:
                 if base == "A1":
-                    conv = build_conversation_A1(audio_arr)
+                    conv = build_conversation_A1(utt, audio_arr)
                 elif base == "A2":
                     conv = build_conversation_A2(masked, audio_arr)
                 else:  # A3

@@ -33,6 +33,7 @@ ALL_CONDITIONS = [
     "MCOT","MDEF","MFS",
     "A1","A2","A3",
     "B1","B2","B3",
+    "A1_mllm","A2_mllm","A3_mllm",
 ]
 
 
@@ -227,7 +228,7 @@ def main():
 
     pairs = [("T1","M1"), ("T2","M2"), ("T3","M3"),
              ("T1","T2"), ("T1","T3"), ("M1","A2"), ("M1","A2_mllm"),
-             ("A1","A1_mllm"), ("A2","A2_mllm"), ("A3","A3_mllm")
+             ("A1","A1_mllm"), ("A2","A2_mllm"), ("A3","A3_mllm"),
              ("T1","T2"), ("T1","T3"), ("M1","A2"),
              ("T2","COT"), ("T2","DEF"), ("T2","FS"),
              ("COT","DEF"), ("COT","FS"), ("DEF","FS"),
