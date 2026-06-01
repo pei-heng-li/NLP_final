@@ -21,6 +21,7 @@ from transformers import AutoProcessor, Qwen2AudioForConditionalGeneration
 # ── Constants ──────────────────────────────────────────────────────────────────
 EMOTIONS = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
 EMOTION_SET = set(EMOTIONS)
+EMOTION_PATTERN = "|".join(EMOTIONS)
 TEXT_CONDITIONS = ["T1","T2","T3","M1","M2","M3","COT","DEF","FS","MCOT","MDEF","MFS"]
 # MODEL_ID = "meta-llama/Llama-3.2-1B-Instruct"
 # MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
@@ -28,7 +29,7 @@ TEXT_CONDITIONS = ["T1","T2","T3","M1","M2","M3","COT","DEF","FS","MCOT","MDEF",
 # MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
 MODEL_ID     = "Qwen/Qwen2-Audio-7B-Instruct"
 DATA_ROOT = Path("./MELD.Raw")
-OUT_ROOT  = Path(f"./results")  # separate folder per model to avoid overwriting results
+OUT_ROOT  = Path(f"./data/llama_3B_instruct")  # separate folder per model to avoid overwriting results
 
 # Emotion keywords: loaded from emotion_lexicon.json (same directory as this script)
 LEXICON_PATH = Path(__file__).parent / "emotion_lexicon.json"
@@ -263,7 +264,8 @@ def prompt_COT(speaker: str, utterance: str, context: str) -> str:
         f'Conversation:"{ctx_block}"\n'
         f'Target utterance: "{utterance}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
-        "Reason step by step, then put the final label on the last line in this exact format:\n"
+        "Use brief reasoning in at most two short sentences. Do not list every option.\n"
+        "Then put the final label on the last line in this exact format:\n"
         "Final answer: <label>"
     )
 
@@ -302,7 +304,8 @@ def prompt_MCOT(speaker: str, masked_utt: str, context: str) -> str:
         f'Conversation:"{ctx_block}"\n'
         f'Target utterance: "{masked_utt}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
-        "Reason step by step, then put the final label on the last line in this exact format:\n"
+        "Use brief reasoning in at most two short sentences. Do not list every option.\n"
+        "Then put the final label on the last line in this exact format:\n"
         "Final answer: <label>"
     )
 
@@ -394,23 +397,33 @@ def build_prompt(condition: str, row: pd.Series, df: pd.DataFrame) -> tuple[str,
 def parse_prediction(text: str) -> str:
     """Extract the first valid emotion label from model output."""
     text_lower = text.strip().lower()
-    final_match = re.search(r"final\s+answer\s*:\s*([a-z]+)", text_lower)
-    if final_match and final_match.group(1) in EMOTION_SET:
-        return final_match.group(1)
-    answer_match = re.search(r"\banswer\s*:\s*([a-z]+)", text_lower)
-    if answer_match and answer_match.group(1) in EMOTION_SET:
-        return answer_match.group(1)
-    # Try exact match on first word/line
-    for line in text_lower.splitlines():
-        line = line.strip().rstrip(".")
-        if line.startswith("final answer:"):
-            line = line.split(":", 1)[1].strip().rstrip(".")
+    text_clean = re.sub(r"[*_`\"']", "", text_lower)
+
+    answer_patterns = [
+        rf"\bfinal\s+(?:answer|label|emotion)\s*(?:is|:|-)?\s*[:\-]?\s*"
+        rf"(?:the\s+emotion\s+is\s+)?(?P<label>{EMOTION_PATTERN})\b",
+        rf"\b(?:answer|emotion|label|classification|prediction)\s*"
+        rf"(?:is|should\s+be|would\s+be|:|-)\s*[:\-]?\s*"
+        rf"(?:the\s+emotion\s+is\s+)?(?P<label>{EMOTION_PATTERN})\b",
+        rf"\b(?:it|this|that)\s+(?:is|seems|sounds|appears)\s+"
+        rf"(?:to\s+be\s+)?(?P<label>{EMOTION_PATTERN})\b",
+        rf"\b(?:therefore|thus|so|overall|in conclusion)[^\n.]*"
+        rf"\b(?P<label>{EMOTION_PATTERN})\b",
+    ]
+    for pattern in answer_patterns:
+        matches = list(re.finditer(pattern, text_clean))
+        if matches:
+            return matches[-1].group("label")
+
+    # Prefer a standalone label near the end of structured outputs.
+    for line in reversed(text_clean.splitlines()):
+        line = line.strip().strip(".:;- ")
         if line in EMOTION_SET:
             return line
-    # Fallback: find first emotion keyword anywhere
-    for emo in EMOTIONS:
-        if emo in text_lower:
-            return emo
+        if len(line.split()) <= 12:
+            label_at_start = re.match(rf"^(?P<label>{EMOTION_PATTERN})\b", line)
+            if label_at_start:
+                return label_at_start.group("label")
     return "neutral"  # ultimate fallback
 
 
@@ -500,13 +513,18 @@ def main():
     parser.add_argument("--split", default="test", choices=["train","dev","test"])
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--max_new_tokens", type=int, default=16)
+    parser.add_argument("--cot_max_new_tokens", type=int, default=192,
+                        help="Minimum max_new_tokens for COT/MCOT conditions")
+    parser.add_argument("--output_dir", type=Path, default=OUT_ROOT,
+                        help=f"Directory for output jsonl files; default: {OUT_ROOT}")
     parser.add_argument("--dry_run", action="store_true",
                         help="Print 3 sample prompts per condition without running model")
     parser.add_argument("--overwrite", action="store_true",
                     help="Overwrite existing output files")
     args = parser.parse_args()
 
-    OUT_ROOT.mkdir(parents=True, exist_ok=True)
+    out_root = args.output_dir
+    out_root.mkdir(parents=True, exist_ok=True)
 
     print(f"Loading {args.split} split …")
     df = load_split(args.split)
@@ -520,7 +538,7 @@ def main():
         print(f"  Condition: {cond}  |  split: {args.split}")
         print(f"{'='*60}")
 
-        out_path = OUT_ROOT / f"{cond}_{args.split}.jsonl"
+        out_path = out_root / f"{cond}_{args.split}.jsonl"
         if out_path.exists() and not args.overwrite and not args.dry_run:
             print(f"  Output already exists: {out_path}. Skipping.")
             continue
@@ -540,9 +558,9 @@ def main():
 
         # Inference
         max_new_tokens = args.max_new_tokens
-        if cond in {"COT", "MCOT"} and max_new_tokens < 96:
-            max_new_tokens = 96
-            print(f"  {cond} condition: using max_new_tokens=96 so the final answer is not truncated.")
+        if cond in {"COT", "MCOT"} and max_new_tokens < args.cot_max_new_tokens:
+            max_new_tokens = args.cot_max_new_tokens
+            print(f"  {cond} condition: using max_new_tokens={max_new_tokens} so the final answer is not truncated.")
         raw_outputs = run_inference(
             tokenizer, model, prompts,
             batch_size=args.batch_size,
