@@ -4,6 +4,8 @@ MELD ERC Experiment: Text Conditions (T1, T2, T3, M1, M2, M3, COT, DEF, FS, MCOT
 Usage:
     python run_text_conditions.py --conditions T1 T2 T3 M1 M2 M3 COT DEF FS MCOT MDEF MFS --split test
     python run_text_conditions.py --conditions FS MCOT MDEF MFS --split test
+
+全部 改好了
 """
 
 import argparse
@@ -179,23 +181,23 @@ def format_input_json(utterance: str, context: str | None = None) -> str:
     }
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
-def prompt_T1(speaker: str, utterance: str) -> str:
+def prompt_T1(utterance: str) -> str:
     return (
         "This is a single-choice question.\n\n"
         "You will be given a target utterance from a conversation.\n"
-        "Your task is to determine the emotion of the speaker when they said the target utterance.\n\n"
+        "Your task is to determine the emotion of the target utterance.\n\n"
         f'Target utterance: "{utterance}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Answer with only one label."
     )
 
-def prompt_T2(speaker: str,utterance: str, context: str) -> str:
+def prompt_T2(utterance: str, context: str) -> str:
     ctx_block = f"Conversation:\n{context}\n\n" if context else ""
     return (
         "This is a single-choice question.\n\n"
         "You will be given a conversation and a target utterance.\n"
         "Your task is to determine the emotion of the target utterance.\n\n"
-        f"{ctx_block}"
+        f'Conversation:"{ctx_block}"\n'
         f'Target utterance: "{utterance}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Answer with only one label."
@@ -206,16 +208,15 @@ def prompt_T3(speaker: str, utterance: str, context: str) -> str:
     return (
         "This is a single-choice question.\n\n"
         "You will be given a conversation and a target utterance.\n"
-        "Your task is to determine the emotion of the target speaker when they said the target utterance.\n\n"
-        f"{ctx_block}"
-        f"Target speaker: {speaker}\n"
+        f"Your task is to determine the emotion of the target speaker {speaker} when they said the target utterance.\n\n"
+        f'Conversation:"{ctx_block}"\n'
         f'Target utterance: "{utterance}"\n\n'
         f"Note: Focus on the emotional state of {speaker} specifically.\n\n"
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Answer with only one label."
     )
 
-def prompt_M1(speaker: str, masked_utt: str) -> str:
+def prompt_M1(masked_utt: str) -> str:
     return (
         "This is a single-choice question.\n\n"
         "You will be given a target utterance from a conversation.\n"
@@ -226,14 +227,14 @@ def prompt_M1(speaker: str, masked_utt: str) -> str:
         "Answer with only one label."
     )
 
-def prompt_M2(speaker: str, masked_utt: str, context: str) -> str:
+def prompt_M2(masked_utt: str, context: str) -> str:
     ctx_block = f"Conversation:\n{context}\n\n" if context else ""
     return (
         "This is a single-choice question.\n\n"
         "You will be given a conversation and a target utterance.\n"
         "Some emotion-bearing words in the target utterance have been replaced with [MASK].\n"
         "Your task is to determine the emotion of the target utterance.\n\n"
-        f"{ctx_block}"
+        f'Conversation:"{ctx_block}"\n'
         f'Target utterance: "{masked_utt}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Answer with only one label."
@@ -245,9 +246,8 @@ def prompt_M3(speaker: str, masked_utt: str, context: str) -> str:
         "This is a single-choice question.\n\n"
         "You will be given a conversation and a target utterance.\n"
         "Some emotion-bearing words in the target utterance have been replaced with [MASK].\n"
-        "Your task is to determine the emotion of the target speaker when they said the target utterance.\n\n"
-        f"{ctx_block}"
-        f"Target speaker: {speaker}\n"
+        f"Your task is to determine the emotion of the target speaker {speaker} when they said the target utterance.\n\n"
+        f'Conversation:"{ctx_block}"\n'
         f'Target utterance: "{masked_utt}"\n\n'
         f"Note: Focus on the emotional state of {speaker} specifically.\n\n"
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
@@ -255,21 +255,23 @@ def prompt_M3(speaker: str, masked_utt: str, context: str) -> str:
     )
 
 def prompt_COT(speaker: str, utterance: str, context: str) -> str:
+    ctx_block = f"Conversation:\n{context}\n\n" if context else ""
     return (
         "This is a single-choice question.\n\n"
         "You will be given a conversation and a target utterance.\n"
-        "Your task is to determine the emotion of the target speaker when they said the target utterance.\n\n"
+        f"Your task is to determine the emotion of the target speaker {speaker} when they said the target utterance.\n\n"
+        f'Conversation:"{ctx_block}"\n'
         f'Target utterance: "{utterance}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Reason step by step, then put the final label on the last line in this exact format:\n"
         "Final answer: <label>"
     )
 
-def prompt_DEF(speaker: str, utterance: str, context: str) -> str:
+def prompt_DEF(utterance: str) -> str:
     return (
         "This is a single-choice question.\n\n"
-        "You will be given a conversation and a target utterance.\n"
-        "Use the emotion definitions below to determine the emotion of the target speaker.\n\n"
+        "You will be given a target utterance from a conversation.\n"
+        "Use the emotion definitions below to determine the emotion of the target utterance.\n\n"
         "Emotion definitions:\n"
         f"{format_definitions()}\n\n"
         f'Target utterance: "{utterance}"\n\n'
@@ -277,16 +279,16 @@ def prompt_DEF(speaker: str, utterance: str, context: str) -> str:
         "Answer with only one label."
     )
 
-def prompt_FS(speaker: str, utterance: str, context: str) -> str:
+def prompt_FS(utterance: str) -> str:
     return (
         "This is a single-choice question.\n\n"
-        "You will be given JSON examples, then a new JSON input.\n"
+        "You will be given JSON examples, then a new input.\n"
         "Each example contains a target_utterance and its gold emotion label.\n"
         "Classify the target utterance in the input using the same label style.\n\n"
         "Examples JSON:\n"
         f"{format_few_shot_examples()}\n\n"
-        "Input JSON:\n"
-        f"{format_input_json(utterance, context)}\n\n"
+        f'Input: "{utterance}"\n\n'
+        f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Answer with only one label."
     )
 
@@ -296,20 +298,20 @@ def prompt_MCOT(speaker: str, masked_utt: str, context: str) -> str:
         "This is a single-choice question.\n\n"
         "You will be given a conversation and a target utterance.\n"
         "Some emotion-bearing words in the target utterance have been replaced with [MASK].\n"
-        "Your task is to determine the emotion of the target speaker when they said the target utterance.\n\n"
+        f"Your task is to determine the emotion of the target speaker {speaker} when they said the target utterance.\n\n"
+        f'Conversation:"{ctx_block}"\n'
         f'Target utterance: "{masked_utt}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Reason step by step, then put the final label on the last line in this exact format:\n"
         "Final answer: <label>"
     )
 
-def prompt_MDEF(speaker: str, masked_utt: str, context: str) -> str:
-    ctx_block = f"Conversation:\n{context}\n\n" if context else ""
+def prompt_MDEF(masked_utt: str) -> str:
     return (
         "This is a single-choice question.\n\n"
         "You will be given a conversation and a target utterance.\n"
         "Some emotion-bearing words in the target utterance have been replaced with [MASK].\n"
-        "Use the emotion definitions below to determine the emotion of the target speaker.\n\n"
+        "Use the emotion definitions below to determine the emotion of the target utterance.\n\n"
         "Emotion definitions:\n"
         f"{format_definitions()}\n\n"
         f'Target utterance: "{masked_utt}"\n\n'
@@ -317,17 +319,17 @@ def prompt_MDEF(speaker: str, masked_utt: str, context: str) -> str:
         "Answer with only one label."
     )
 
-def prompt_MFS(speaker: str, masked_utt: str, context: str) -> str:
+def prompt_MFS(masked_utt: str) -> str:
     return (
         "This is a single-choice question.\n\n"
-        "You will be given JSON examples, then a new JSON input.\n"
+        "You will be given JSON examples, then a new input.\n"
         "Each example contains a target_utterance and its gold emotion label.\n"
         "In the input, some emotion-bearing words in the target_utterance may have been replaced with [MASK].\n"
         "Classify the target utterance in the input using the same label style.\n\n"
         "Examples JSON:\n"
         f"{format_few_shot_examples()}\n\n"
-        "Input JSON:\n"
-        f"{format_input_json(masked_utt, context)}\n\n"
+        f'Input: "{masked_utt}"\n\n'
+        f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
         "Answer with only one label."
     )
 
@@ -342,22 +344,22 @@ def build_prompt(condition: str, row: pd.Series, df: pd.DataFrame) -> tuple[str,
     masked   = mask_utterance(utt)
 
     if condition == "T1":
-        prompt = prompt_T1(speaker, utt)
+        prompt = prompt_T1(utt)
         meta   = {"context": None, "masked_utterance": None}
     elif condition == "T2":
         ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
-        prompt = prompt_T2(speaker, utt, ctx)
+        prompt = prompt_T2(utt, ctx)
         meta   = {"context": ctx, "masked_utterance": None}
     elif condition == "T3":
         ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
         prompt = prompt_T3(speaker, utt, ctx)
         meta   = {"context": ctx, "masked_utterance": None}
     elif condition == "M1":
-        prompt = prompt_M1(speaker, masked)
+        prompt = prompt_M1(masked)
         meta   = {"context": None, "masked_utterance": masked}
     elif condition == "M2":
         ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
-        prompt = prompt_M2(speaker, masked, ctx)
+        prompt = prompt_M2(masked, ctx)
         meta   = {"context": ctx, "masked_utterance": masked}
     elif condition == "M3":
         ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
@@ -368,25 +370,21 @@ def build_prompt(condition: str, row: pd.Series, df: pd.DataFrame) -> tuple[str,
         prompt = prompt_COT(speaker, utt, ctx)
         meta   = {"context": ctx, "masked_utterance": None}
     elif condition == "DEF":
-        ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
-        prompt = prompt_DEF(speaker, utt, ctx)
-        meta   = {"context": ctx, "masked_utterance": None}
+        prompt = prompt_DEF(utt)
+        meta   = {"context": None, "masked_utterance": None}
     elif condition == "FS":
-        ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
-        prompt = prompt_FS(speaker, utt, ctx)
-        meta   = {"context": ctx, "masked_utterance": None}
+        prompt = prompt_FS(utt)
+        meta   = {"context": None, "masked_utterance": None}
     elif condition == "MCOT":
         ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
         prompt = prompt_MCOT(speaker, masked, ctx)
         meta   = {"context": ctx, "masked_utterance": masked}
     elif condition == "MDEF":
-        ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
-        prompt = prompt_MDEF(speaker, masked, ctx)
-        meta   = {"context": ctx, "masked_utterance": masked}
+        prompt = prompt_MDEF(masked)
+        meta   = {"context": None, "masked_utterance": masked}
     elif condition == "MFS":
-        ctx, _ = build_context(df, dia_id, utt_id, use_masked_target=False)
-        prompt = prompt_MFS(speaker, masked, ctx)
-        meta   = {"context": ctx, "masked_utterance": masked}
+        prompt = prompt_MFS(masked)
+        meta   = {"context": None, "masked_utterance": masked}
     else:
         raise ValueError(f"Unknown condition: {condition}")
     return prompt, meta

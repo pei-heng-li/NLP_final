@@ -1,11 +1,11 @@
 """
 MELD ERC Unified Evaluation
 Computes: Macro F1, Weighted F1, Masking Drop, Context Recovery,
-          Prediction Change Rate, Confusion Matrix, per-class F1
+          Prediction Change Rate, Confusion Matrix, per-class metrics
 
 Usage:
     python evaluate.py --split test
-    python evaluate.py --split test --conditions T1 T2 COT DEF FS MCOT MDEF MFS
+    python evaluate.py --split test --conditions T1 T2 T3 DEF FS COT M1 M2 M3 MDEF MFS MCOT
     python evaluate.py --split test --results_dir data/llama_1B_instruct
 """
 
@@ -17,7 +17,8 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 from sklearn.metrics import (
-    f1_score, confusion_matrix, classification_report
+    precision_score, recall_score, f1_score,
+    confusion_matrix, classification_report
 )
 
 # ── Constants ──────────────────────────────────────────────────────────────────
@@ -54,17 +55,54 @@ def load_condition(condition: str, split: str, out_root: Path) -> pd.DataFrame |
 
 
 # ── Core Metrics ───────────────────────────────────────────────────────────────
-def compute_f1(df: pd.DataFrame) -> dict:
+def compute_metrics(df: pd.DataFrame) -> dict:
     gold  = df["gold"].tolist()
     preds = df["prediction"].tolist()
-    macro    = f1_score(gold, preds, average="macro",    labels=EMOTIONS, zero_division=0)
-    weighted = f1_score(gold, preds, average="weighted", labels=EMOTIONS, zero_division=0)
-    per_cls  = f1_score(gold, preds, average=None,       labels=EMOTIONS, zero_division=0)
+    macro_precision = precision_score(
+        gold, preds, average="macro", labels=EMOTIONS, zero_division=0
+    )
+    macro_recall = recall_score(
+        gold, preds, average="macro", labels=EMOTIONS, zero_division=0
+    )
+    macro_f1 = f1_score(
+        gold, preds, average="macro", labels=EMOTIONS, zero_division=0
+    )
+    weighted_precision = precision_score(
+        gold, preds, average="weighted", labels=EMOTIONS, zero_division=0
+    )
+    weighted_recall = recall_score(
+        gold, preds, average="weighted", labels=EMOTIONS, zero_division=0
+    )
+    weighted_f1 = f1_score(
+        gold, preds, average="weighted", labels=EMOTIONS, zero_division=0
+    )
+    per_cls_precision = precision_score(
+        gold, preds, average=None, labels=EMOTIONS, zero_division=0
+    )
+    per_cls_recall = recall_score(
+        gold, preds, average=None, labels=EMOTIONS, zero_division=0
+    )
+    per_cls_f1 = f1_score(
+        gold, preds, average=None, labels=EMOTIONS, zero_division=0
+    )
     return {
-        "macro_f1":    round(macro,    4),
-        "weighted_f1": round(weighted, 4),
-        "per_class":   {e: round(v, 4) for e, v in zip(EMOTIONS, per_cls)},
-        "n":           len(df),
+        "macro_precision":    round(macro_precision,    4),
+        "macro_recall":       round(macro_recall,       4),
+        "macro_f1":           round(macro_f1,           4),
+        "weighted_precision": round(weighted_precision, 4),
+        "weighted_recall":    round(weighted_recall,    4),
+        "weighted_f1":        round(weighted_f1,        4),
+        "per_class": {
+            e: {
+                "precision": round(p, 4),
+                "recall":    round(r, 4),
+                "f1":        round(f, 4),
+            }
+            for e, p, r, f in zip(
+                EMOTIONS, per_cls_precision, per_cls_recall, per_cls_f1
+            )
+        },
+        "n": len(df),
     }
 
 
@@ -95,11 +133,18 @@ def build_summary(results: dict[str, dict]) -> pd.DataFrame:
     rows = []
     for cond, res in results.items():
         row = {"Condition": cond,
-               "N":           res["n"],
-               "Macro F1":    res["macro_f1"],
-               "Weighted F1": res["weighted_f1"]}
+               "N":                  res["n"],
+               "Macro Precision":    res["macro_precision"],
+               "Macro Recall":       res["macro_recall"],
+               "Macro F1":           res["macro_f1"],
+               "Weighted Precision": res["weighted_precision"],
+               "Weighted Recall":    res["weighted_recall"],
+               "Weighted F1":        res["weighted_f1"]}
         for emo in EMOTIONS:
-            row[f"F1_{emo}"] = res["per_class"].get(emo, 0.0)
+            metrics = res["per_class"].get(emo, {})
+            row[f"P_{emo}"]  = metrics.get("precision", 0.0)
+            row[f"R_{emo}"]  = metrics.get("recall", 0.0)
+            row[f"F1_{emo}"] = metrics.get("f1", 0.0)
         rows.append(row)
     return pd.DataFrame(rows).set_index("Condition")
 
@@ -162,7 +207,7 @@ def main():
             print(f"  [SKIP] {cond}: no output file found")
             continue
         dfs[cond] = df
-        results[cond] = compute_f1(df)
+        results[cond] = compute_metrics(df)
         print(f"  [OK]   {cond}: macro_f1={results[cond]['macro_f1']:.4f}, "
               f"weighted_f1={results[cond]['weighted_f1']:.4f}, n={results[cond]['n']}")
 
@@ -173,7 +218,7 @@ def main():
     # ── Summary table ──────────────────────────────────────────────────────────
     summary = build_summary(results)
     print(f"\n{'='*70}")
-    print("SUMMARY TABLE (Macro F1 / Weighted F1 / Per-class F1)")
+    print("SUMMARY TABLE (Precision / Recall / F1)")
     print('='*70)
     print(summary.to_string())
 
@@ -272,18 +317,28 @@ def main():
         print(f"\n  [{cond}]")
         print(cm.to_string())
 
-    # ── Per-class F1 heatmap table ─────────────────────────────────────────────
-    cls_rows = []
+    # ── Per-class metric tables ────────────────────────────────────────────────
+    f1_rows = []
+    metric_rows = []
     for cond, res in results.items():
-        row = {"Condition": cond}
-        row.update(res["per_class"])
-        cls_rows.append(row)
-    cls_df = pd.DataFrame(cls_rows).set_index("Condition")
+        f1_row = {"Condition": cond}
+        metric_row = {"Condition": cond}
+        for emo in EMOTIONS:
+            metrics = res["per_class"].get(emo, {})
+            f1_row[emo] = metrics.get("f1", 0.0)
+            metric_row[f"P_{emo}"] = metrics.get("precision", 0.0)
+            metric_row[f"R_{emo}"] = metrics.get("recall", 0.0)
+            metric_row[f"F1_{emo}"] = metrics.get("f1", 0.0)
+        f1_rows.append(f1_row)
+        metric_rows.append(metric_row)
+    cls_df = pd.DataFrame(f1_rows).set_index("Condition")
+    cls_metrics_df = pd.DataFrame(metric_rows).set_index("Condition")
     cls_df.to_csv(EVAL_ROOT / f"per_class_f1_{args.split}.csv")
+    cls_metrics_df.to_csv(EVAL_ROOT / f"per_class_metrics_{args.split}.csv")
     print(f"\n{'='*70}")
-    print("PER-CLASS F1")
+    print("PER-CLASS METRICS")
     print('='*70)
-    print(cls_df.to_string())
+    print(cls_metrics_df.to_string())
 
     # ── Full classification report per condition ───────────────────────────────
     for cond, df in dfs.items():
