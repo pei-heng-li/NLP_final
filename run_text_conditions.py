@@ -25,11 +25,11 @@ EMOTION_PATTERN = "|".join(EMOTIONS)
 TEXT_CONDITIONS = ["T1","T2","T3","M1","M2","M3","COT","DEF","FS","MCOT","MDEF","MFS"]
 # MODEL_ID = "meta-llama/Llama-3.2-1B-Instruct"
 # MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
-# MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
+MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
 # MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
-MODEL_ID     = "Qwen/Qwen2-Audio-7B-Instruct"
+# MODEL_ID     = "Qwen/Qwen2-Audio-7B-Instruct"
 DATA_ROOT = Path("./MELD.Raw")
-OUT_ROOT  = Path(f"./data/llama_3B_instruct")  # separate folder per model to avoid overwriting results
+OUT_ROOT  = Path(f"./data/llama_8B_instruct")  # separate folder per model to avoid overwriting results
 
 # Emotion keywords: loaded from emotion_lexicon.json (same directory as this script)
 LEXICON_PATH = Path(__file__).parent / "emotion_lexicon.json"
@@ -120,6 +120,13 @@ def build_context(df: pd.DataFrame, dia_id: int, utt_id: int,
 
 # ── Prompt Builders ────────────────────────────────────────────────────────────
 EMOTION_OPTS = ", ".join(EMOTIONS)
+COT_FINAL_INSTRUCTION = (
+    "Use brief reasoning in at most two short sentences. Do not list every option.\n"
+    "You must choose exactly one label from the options, even when the evidence is limited.\n"
+    "Do not output synonyms, explanations, or any word after the label on the final line.\n"
+    "Then put the final label on the last line in this exact format:\n"
+    "Final answer: <label>"
+)
 
 EMOTION_DEFINITIONS = {
     "surprise": "unexpectedness, shock, or sudden realization.",
@@ -264,9 +271,7 @@ def prompt_COT(speaker: str, utterance: str, context: str) -> str:
         f'Conversation:"{ctx_block}"\n'
         f'Target utterance: "{utterance}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
-        "Use brief reasoning in at most two short sentences. Do not list every option.\n"
-        "Then put the final label on the last line in this exact format:\n"
-        "Final answer: <label>"
+        f"{COT_FINAL_INSTRUCTION}"
     )
 
 def prompt_DEF(utterance: str) -> str:
@@ -300,13 +305,12 @@ def prompt_MCOT(speaker: str, masked_utt: str, context: str) -> str:
         "This is a single-choice question.\n\n"
         "You will be given a conversation and a target utterance.\n"
         "Some emotion-bearing words in the target utterance have been replaced with [MASK].\n"
+        "Treat [MASK] as hidden emotion evidence; infer from the remaining wording and context.\n"
         f"Your task is to determine the emotion of the target speaker {speaker} when they said the target utterance.\n\n"
         f'Conversation:"{ctx_block}"\n'
         f'Target utterance: "{masked_utt}"\n\n'
         f"Choose one emotion from the following options:\n{EMOTION_OPTS}\n\n"
-        "Use brief reasoning in at most two short sentences. Do not list every option.\n"
-        "Then put the final label on the last line in this exact format:\n"
-        "Final answer: <label>"
+        f"{COT_FINAL_INSTRUCTION}"
     )
 
 def prompt_MDEF(masked_utt: str) -> str:
@@ -402,6 +406,20 @@ def parse_prediction(text: str) -> str:
     answer_patterns = [
         rf"\bfinal\s+(?:answer|label|emotion)\s*(?:is|:|-)?\s*[:\-]?\s*"
         rf"(?:the\s+emotion\s+is\s+)?(?P<label>{EMOTION_PATTERN})\b",
+        rf"\bfinal\s+(?:answer|label|emotion)\s*(?:is|:|-)?\s*[:\-]?\s*"
+        rf"[^\n]*\b(?P<label>{EMOTION_PATTERN})\b",
+        rf"\b(?:i\s+would\s+|i\s+will\s+|i\s+)?"
+        rf"(?:choose|select|pick)\s*(?:the\s+label\s*)?"
+        rf"(?:as|is|:|-)?\s*[:\-]?\s*(?P<label>{EMOTION_PATTERN})\b",
+        rf"\b(?:i\s+would\s+|i\s+will\s+|i\s+)?"
+        rf"(?:label|classify)\b[^\n.]*?\b(?:as|is|:|-)\s*[:\-]?\s*"
+        rf"(?P<label>{EMOTION_PATTERN})\b",
+        rf"\b(?:i\s+would\s+|i\s+will\s+|i\s+)?"
+        rf"(?:label|classify)\s+(?:the\s+emotion\s+)?"
+        rf"(?:as|is|:|-)\s*[:\-]?\s*(?P<label>{EMOTION_PATTERN})\b",
+        rf"\bemotion(?:\s+of\s+[^\n:]+?)?\s*"
+        rf"(?:is|should\s+be|would\s+be|:|-)\s*[:\-]?\s*"
+        rf"(?:the\s+emotion\s+is\s+)?(?P<label>{EMOTION_PATTERN})\b",
         rf"\b(?:answer|emotion|label|classification|prediction)\s*"
         rf"(?:is|should\s+be|would\s+be|:|-)\s*[:\-]?\s*"
         rf"(?:the\s+emotion\s+is\s+)?(?P<label>{EMOTION_PATTERN})\b",
@@ -449,7 +467,7 @@ def load_model():
     return tokenizer, model
 
 
-def run_inference(tokenizer, model, prompts, batch_size=16, max_new_tokens=16):
+def run_inference(tokenizer, model, prompts, batch_size=16, max_new_tokens=128):
     if "qwen2-audio" in MODEL_ID.lower():
         # Qwen2-Audio text-only: 直接 tokenize + generate，不走 pipeline
         results = []
@@ -504,6 +522,31 @@ def run_inference(tokenizer, model, prompts, batch_size=16, max_new_tokens=16):
         return results
 
 
+def reparse_output_file(in_path: Path, out_path: Path) -> None:
+    if not in_path.exists():
+        print(f"  [SKIP] Missing input file: {in_path}")
+        return
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+
+    total = 0
+    changed = 0
+    with open(in_path, encoding="utf-8") as fin, open(tmp_path, "w", encoding="utf-8") as fout:
+        for line in fin:
+            record = json.loads(line)
+            old_pred = str(record.get("prediction", "")).strip().lower()
+            new_pred = parse_prediction(str(record.get("raw_output", "")))
+            if old_pred != new_pred:
+                changed += 1
+            record["prediction"] = new_pred
+            fout.write(json.dumps(record, ensure_ascii=False) + "\n")
+            total += 1
+
+    os.replace(tmp_path, out_path)
+    print(f"  Reparsed {total} records: {changed} predictions changed -> {out_path}")
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser()
@@ -515,8 +558,12 @@ def main():
     parser.add_argument("--max_new_tokens", type=int, default=16)
     parser.add_argument("--cot_max_new_tokens", type=int, default=192,
                         help="Minimum max_new_tokens for COT/MCOT conditions")
+    parser.add_argument("--input_dir", type=Path, default=None,
+                        help="Directory to read existing jsonl files when using --reparse_only")
     parser.add_argument("--output_dir", type=Path, default=OUT_ROOT,
                         help=f"Directory for output jsonl files; default: {OUT_ROOT}")
+    parser.add_argument("--reparse_only", action="store_true",
+                        help="Recompute prediction from raw_output in existing jsonl files without running the model")
     parser.add_argument("--dry_run", action="store_true",
                         help="Print 3 sample prompts per condition without running model")
     parser.add_argument("--overwrite", action="store_true",
@@ -525,12 +572,14 @@ def main():
 
     out_root = args.output_dir
     out_root.mkdir(parents=True, exist_ok=True)
+    in_root = args.input_dir or out_root
 
-    print(f"Loading {args.split} split …")
-    df = load_split(args.split)
-    print(f"  {len(df)} utterances loaded.")
+    if not args.reparse_only:
+        print(f"Loading {args.split} split …")
+        df = load_split(args.split)
+        print(f"  {len(df)} utterances loaded.")
 
-    if not args.dry_run:
+    if not args.dry_run and not args.reparse_only:
         tokenizer, model = load_model()
 
     for cond in args.conditions:
@@ -539,6 +588,11 @@ def main():
         print(f"{'='*60}")
 
         out_path = out_root / f"{cond}_{args.split}.jsonl"
+        if args.reparse_only:
+            in_path = in_root / f"{cond}_{args.split}.jsonl"
+            reparse_output_file(in_path, out_path)
+            continue
+
         if out_path.exists() and not args.overwrite and not args.dry_run:
             print(f"  Output already exists: {out_path}. Skipping.")
             continue
