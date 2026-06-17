@@ -25,14 +25,11 @@ from transformers import VoxtralForConditionalGeneration
 EMOTIONS     = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
 EMOTION_SET  = set(EMOTIONS)
 EMOTION_OPTS = ", ".join(EMOTIONS)
-# MODEL_ID     = "meta-llama/Llama-3.2-1B-Instruct"
-# MODEL_ID     = "meta-llama/Llama-3.2-3B-Instruct"
-# MODEL_ID     = "meta-llama/Llama-3.1-8B-Instruct"
-# MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
-MODEL_ID     = "Qwen/Qwen2-Audio-7B-Instruct"
-# MODEL_ID     = "mistralai/Voxtral-Mini-3B-2507"
-DATA_ROOT    = Path("./MELD.Raw")
-OUT_ROOT     = Path("./data/Qwen2-Audio-7B-Instruct")
+# MODEL_ID and OUT_ROOT are set at runtime via --model_id / --output_dir in run_all.sh.
+# Do not hardcode a model here.
+MODEL_ID  = ""
+DATA_ROOT = Path("./MELD.Raw")
+OUT_ROOT  = Path("./data")
 FEAT_CACHE   = Path("./audio_features")
 
 # Audio split dirs per data split
@@ -494,8 +491,19 @@ def main():
                         help="Print 3 sample prompts per condition without running model")
     parser.add_argument("--overwrite", action="store_true",
                     help="Overwrite existing output files")
+    parser.add_argument("--model_id", type=str, default=None,
+                        help="Override MODEL_ID (e.g. mistralai/Voxtral-Mini-3B-2507)")
+    parser.add_argument("--output_dir", type=Path, default=None,
+                        help="Override output directory")
     args = parser.parse_args()
 
+    global MODEL_ID, OUT_ROOT
+    if args.model_id:
+        MODEL_ID = args.model_id
+    if args.output_dir:
+        OUT_ROOT = args.output_dir
+    else:
+        OUT_ROOT = Path(f"./data/{MODEL_ID.split('/')[-1]}")
     OUT_ROOT.mkdir(parents=True, exist_ok=True)
 
     print(f"Loading {args.split} split …")

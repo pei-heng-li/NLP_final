@@ -24,14 +24,11 @@ EMOTIONS = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
 EMOTION_SET = set(EMOTIONS)
 EMOTION_PATTERN = "|".join(EMOTIONS)
 TEXT_CONDITIONS = ["T1","T2","T3","M1","M2","M3","COT","DEF","FS","MCOT","MDEF","MFS"]
-# MODEL_ID = "meta-llama/Llama-3.2-1B-Instruct"
-# MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
-# MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
-# MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
-MODEL_ID     = "Qwen/Qwen2-Audio-7B-Instruct"
-# MODEL_ID = "mistralai/Voxtral-Mini-3B-2507"
+# MODEL_ID and OUT_ROOT are set at runtime via --model_id / --output_dir in run_all.sh.
+# Do not hardcode a model here.
+MODEL_ID  = ""
 DATA_ROOT = Path("./MELD.Raw")
-OUT_ROOT  = Path(f"./data/Qwen2-Audio-7B-Instruct")  # separate folder per model to avoid overwriting results
+OUT_ROOT  = Path("./data")
 
 # Emotion keywords: loaded from emotion_lexicon.json (same directory as this script)
 LEXICON_PATH = Path(__file__).parent / "emotion_lexicon.json"
@@ -662,17 +659,27 @@ def main():
                         help="Minimum max_new_tokens for COT/MCOT conditions")
     parser.add_argument("--input_dir", type=Path, default=None,
                         help="Directory to read existing jsonl files when using --reparse_only")
-    parser.add_argument("--output_dir", type=Path, default=OUT_ROOT,
-                        help=f"Directory for output jsonl files; default: {OUT_ROOT}")
+    parser.add_argument("--output_dir", type=Path, default=None,
+                        help="Directory to save output jsonl files (default: ./data/<model_name>)")
     parser.add_argument("--reparse_only", action="store_true",
                         help="Recompute prediction from raw_output in existing jsonl files without running the model")
     parser.add_argument("--dry_run", action="store_true",
                         help="Print 3 sample prompts per condition without running model")
     parser.add_argument("--overwrite", action="store_true",
                     help="Overwrite existing output files")
+    parser.add_argument("--model_id", type=str, default=None,
+                        help="Override MODEL_ID (e.g. mistralai/Voxtral-Mini-3B-2507)")
     args = parser.parse_args()
 
-    out_root = args.output_dir
+    # Override module-level MODEL_ID and OUT_ROOT if --model_id or --output_dir given
+    global MODEL_ID, OUT_ROOT
+    if args.model_id:
+        MODEL_ID = args.model_id
+    if args.output_dir:
+        OUT_ROOT = args.output_dir
+    else:
+        OUT_ROOT = Path(f"./data/{MODEL_ID.split('/')[-1]}")
+    out_root = OUT_ROOT
     out_root.mkdir(parents=True, exist_ok=True)
     in_root = args.input_dir or out_root
 

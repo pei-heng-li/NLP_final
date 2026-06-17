@@ -50,7 +50,7 @@ EMOTIONS     = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgu
 EMOTION_SET  = set(EMOTIONS)
 EMOTION_OPTS = ", ".join(EMOTIONS)
 DATA_ROOT    = Path("./MELD.Raw")
-OUT_ROOT     = Path("./data/Qwen2-Audio-7B-Instruct")  # separate folder per model to avoid overwriting results
+OUT_ROOT  = Path("./data")  # overridden at runtime by --output_dir
 LEXICON_PATH = Path(__file__).parent / "emotion_lexicon.json"
 SAMPLE_RATE  = 16000  # Qwen2-Audio expects 16kHz numpy array
 
@@ -437,10 +437,17 @@ def main():
     parser.add_argument("--max_samples", type=int, default=None)
     parser.add_argument("--overwrite", action="store_true",
                         help="Overwrite existing output files")
+    parser.add_argument("--output_dir", type=Path, default=None,
+                        help="Override output directory")
     args = parser.parse_args()
 
     suffix    = SUFFIXES[args.model]
     model_id  = MODELS[args.model]
+    global OUT_ROOT
+    if args.output_dir:
+        OUT_ROOT = args.output_dir
+    else:
+        OUT_ROOT = Path(f"./data/{model_id.split('/')[-1]}")
     OUT_ROOT.mkdir(parents=True, exist_ok=True)
 
     print(f"Loading {args.split} split …")

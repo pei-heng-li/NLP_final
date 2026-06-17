@@ -24,8 +24,9 @@ from sklearn.metrics import (
 # ── Constants ──────────────────────────────────────────────────────────────────
 EMOTIONS  = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
 
-OUT_ROOT  = Path("./data/Qwen2-Audio-7B-Instruct")
-EVAL_ROOT = Path("./data/Qwen2-Audio-7B-Instruct/eval")
+# OUT_ROOT and EVAL_ROOT are derived from --results_dir at runtime.
+OUT_ROOT  = Path("./data")
+EVAL_ROOT = Path("./data/eval")
 
 ALL_CONDITIONS = [
     "T1","T2","T3",
@@ -190,6 +191,8 @@ def main():
                         help=f"Directory containing *_{{split}}.jsonl files; default: {OUT_ROOT}")
     args = parser.parse_args()
 
+    global EVAL_ROOT
+    EVAL_ROOT = args.results_dir / "eval"
     EVAL_ROOT.mkdir(parents=True, exist_ok=True)
 
     target_conditions = args.conditions if args.conditions else ALL_CONDITIONS
