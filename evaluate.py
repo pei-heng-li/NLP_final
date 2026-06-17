@@ -24,8 +24,8 @@ from sklearn.metrics import (
 # ── Constants ──────────────────────────────────────────────────────────────────
 EMOTIONS  = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
 
-OUT_ROOT  = Path("./data/llama_3B_instruct")
-EVAL_ROOT = Path("./data/llama_3B_instruct/eval")
+OUT_ROOT  = Path("./data/Qwen2-Audio-7B-Instruct")
+EVAL_ROOT = Path("./data/Qwen2-Audio-7B-Instruct/eval")
 
 ALL_CONDITIONS = [
     "T1","T2","T3",

@@ -17,6 +17,7 @@ import torch
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 from transformers import AutoProcessor, Qwen2AudioForConditionalGeneration
+from transformers import VoxtralForConditionalGeneration
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 EMOTIONS = ["surprise", "anger", "neutral", "joy", "sadness", "fear", "disgust"]
@@ -25,11 +26,12 @@ EMOTION_PATTERN = "|".join(EMOTIONS)
 TEXT_CONDITIONS = ["T1","T2","T3","M1","M2","M3","COT","DEF","FS","MCOT","MDEF","MFS"]
 # MODEL_ID = "meta-llama/Llama-3.2-1B-Instruct"
 # MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
-MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
+# MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
 # MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
-# MODEL_ID     = "Qwen/Qwen2-Audio-7B-Instruct"
+MODEL_ID     = "Qwen/Qwen2-Audio-7B-Instruct"
+# MODEL_ID = "mistralai/Voxtral-Mini-3B-2507"
 DATA_ROOT = Path("./MELD.Raw")
-OUT_ROOT  = Path(f"./data/llama_8B_instruct")  # separate folder per model to avoid overwriting results
+OUT_ROOT  = Path(f"./data/Qwen2-Audio-7B-Instruct")  # separate folder per model to avoid overwriting results
 
 # Emotion keywords: loaded from emotion_lexicon.json (same directory as this script)
 LEXICON_PATH = Path(__file__).parent / "emotion_lexicon.json"
@@ -55,7 +57,7 @@ def load_split(split: str) -> pd.DataFrame:
     fname = {"train": "train_sent_emo.csv",
              "dev":   "dev_sent_emo.csv",
              "test":  "test_sent_emo.csv"}[split]
-    df = pd.read_csv(DATA_ROOT / fname)
+    df = pd.read_csv(DATA_ROOT / fname, encoding="cp1252")
     df.columns = df.columns.str.strip()
     # Normalise emotion labels to lowercase
     df["Emotion"] = df["Emotion"].str.strip().str.lower()
@@ -447,7 +449,14 @@ def parse_prediction(text: str) -> str:
 
 # ── Model Inference ────────────────────────────────────────────────────────────
 def load_model():
+    """
+    Returns (tokenizer, model, processor_or_none).
+    processor_or_none is set for Voxtral/Qwen2-Audio so run_inference can
+    use processor.apply_chat_template for text-only prompts (the tokenizer
+    alone doesn't carry a chat_template for these models).
+    """
     print(f"Loading model: {MODEL_ID}")
+    processor = None
     if "qwen2-audio" in MODEL_ID.lower():
         processor = AutoProcessor.from_pretrained(MODEL_ID)
         tokenizer = processor.tokenizer
@@ -455,6 +464,14 @@ def load_model():
             tokenizer.pad_token_id = tokenizer.eos_token_id
         model = Qwen2AudioForConditionalGeneration.from_pretrained(
             MODEL_ID, dtype=torch.bfloat16, device_map="auto"
+        )
+    elif "voxtral" in MODEL_ID.lower():
+        processor = AutoProcessor.from_pretrained(MODEL_ID)
+        tokenizer = processor.tokenizer
+        if tokenizer.pad_token_id is None:
+            tokenizer.pad_token_id = tokenizer.eos_token_id
+        model = VoxtralForConditionalGeneration.from_pretrained(
+            MODEL_ID, torch_dtype=torch.bfloat16, device_map="auto"
         )
     else:
         tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
@@ -464,29 +481,114 @@ def load_model():
             MODEL_ID, dtype=torch.bfloat16, device_map="auto"
         )
     model.eval()
-    return tokenizer, model
+    return tokenizer, model, processor
 
 
-def run_inference(tokenizer, model, prompts, batch_size=16, max_new_tokens=128):
-    if "qwen2-audio" in MODEL_ID.lower():
-        # Qwen2-Audio text-only: 直接 tokenize + generate，不走 pipeline
+def _apply_chat_template(tokenizer, processor, prompt: str) -> str:
+    """
+    Apply chat template for a single text prompt.
+    Voxtral uses mistral-common's tekken tokenizer which has no HF chat_template.
+    We apply the Mistral instruct format directly: <s>[INST] ... [/INST]
+    Other models use tokenizer.apply_chat_template as usual.
+    """
+    if "voxtral" in MODEL_ID.lower():
+        return f"<s>[INST] {prompt} [/INST]"
+    msg = [{"role": "user", "content": prompt}]
+    if processor is not None:
+        return processor.apply_chat_template(
+            msg, tokenize=False, add_generation_prompt=True
+        )
+    return tokenizer.apply_chat_template(
+        msg, tokenize=False, add_generation_prompt=True
+    )
+
+
+def _encode_voxtral_batch(prompts: list[str], device) -> dict:
+    """
+    Tokenize a batch of plain-text prompts using mistral_common (tekken).
+    Returns a dict with padded input_ids and attention_mask tensors.
+    """
+    from mistral_common.protocol.instruct.messages import UserMessage
+    from mistral_common.protocol.instruct.request import ChatCompletionRequest
+    from mistral_common.tokens.tokenizers.mistral import MistralTokenizer
+
+    # Voxtral uses the tekken (v3) tokenizer
+    mc_tok = MistralTokenizer.v3(is_tekken=True)
+
+    all_ids = []
+    for p in prompts:
+        req = ChatCompletionRequest(messages=[UserMessage(content=p)])
+        tokens = mc_tok.encode_chat_completion(req).tokens
+        all_ids.append(tokens)
+
+    # Pad left (decoder-only models typically left-pad)
+    max_len = max(len(t) for t in all_ids)
+    pad_id  = mc_tok.instruct_tokenizer.tokenizer.eos_id  # use eos as pad
+    input_ids      = []
+    attention_mask = []
+    for ids in all_ids:
+        pad_len = max_len - len(ids)
+        input_ids.append([pad_id] * pad_len + ids)
+        attention_mask.append([0] * pad_len + [1] * len(ids))
+
+    return {
+        "input_ids":      torch.tensor(input_ids,      dtype=torch.long).to(device),
+        "attention_mask": torch.tensor(attention_mask, dtype=torch.long).to(device),
+    }
+
+
+def _decode_voxtral_batch(output_ids, input_len: int) -> list[str]:
+    """Decode generated token ids using mistral_common (tekken)."""
+    from mistral_common.tokens.tokenizers.mistral import MistralTokenizer
+    mc_tok = MistralTokenizer.v3(is_tekken=True)
+    results = []
+    for row in output_ids[:, input_len:]:
+        ids = row.tolist()
+        # Strip padding / eos from the end
+        eos_id = mc_tok.instruct_tokenizer.tokenizer.eos_id
+        if eos_id in ids:
+            ids = ids[:ids.index(eos_id)]
+        text = mc_tok.instruct_tokenizer.tokenizer.decode(ids)
+        results.append(text.strip())
+    return results
+
+
+def run_inference(tokenizer, model, prompts, batch_size=16, max_new_tokens=128,
+                  processor=None):
+    if "voxtral" in MODEL_ID.lower():
+        # Voxtral uses mistral_common tekken tokenizer — not compatible with
+        # HF tokenizer.apply_chat_template or tokenizer() calls.
+        results = []
+        total = len(prompts)
+        for i in range(0, total, batch_size):
+            batch = prompts[i : i + batch_size]
+            enc = _encode_voxtral_batch(batch, model.device)
+            input_len = enc["input_ids"].shape[1]
+            with torch.no_grad():
+                out = model.generate(
+                    **enc, max_new_tokens=max_new_tokens, do_sample=False
+                )
+            results.extend(_decode_voxtral_batch(out, input_len))
+            print(f"  [{min(i+batch_size, total)}/{total}] done", end="\r")
+        print()
+        return results
+    elif "qwen2-audio" in MODEL_ID.lower():
+        # Qwen2-Audio text-only: direct tokenize + generate
         results = []
         total = len(prompts)
         for i in range(0, total, batch_size):
             batch = prompts[i : i + batch_size]
             chat_prompts = [
-                tokenizer.apply_chat_template(
-                    [{"role": "user", "content": p}],
-                    tokenize=False, add_generation_prompt=True,
-                )
-                for p in batch
+                _apply_chat_template(tokenizer, processor, p) for p in batch
             ]
             enc = tokenizer(chat_prompts, return_tensors="pt",
-                            padding=True, truncation=True).to(model.device)
+                padding=True, truncation=True,
+                max_length=2048).to(model.device)
             with torch.no_grad():
                 out = model.generate(
                     **enc, max_new_tokens=max_new_tokens, do_sample=False
                 )
+            torch.cuda.empty_cache()
             input_len = enc["input_ids"].shape[1]
             decoded = tokenizer.batch_decode(
                 out[:, input_len:], skip_special_tokens=True
@@ -580,7 +682,7 @@ def main():
         print(f"  {len(df)} utterances loaded.")
 
     if not args.dry_run and not args.reparse_only:
-        tokenizer, model = load_model()
+        tokenizer, model, processor = load_model()
 
     for cond in args.conditions:
         print(f"\n{'='*60}")
@@ -619,6 +721,7 @@ def main():
             tokenizer, model, prompts,
             batch_size=args.batch_size,
             max_new_tokens=max_new_tokens,
+            processor=processor,
         )
 
         # Parse and save
