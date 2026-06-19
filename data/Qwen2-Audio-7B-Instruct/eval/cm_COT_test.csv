@@ -1,0 +1,8 @@
+True \ Pred (COT),surprise,anger,neutral,joy,sadness,fear,disgust
+surprise,207,4,23,41,1,4,1
+anger,187,45,52,37,14,8,2
+neutral,376,12,604,213,29,18,4
+joy,69,2,71,254,3,1,2
+sadness,66,2,39,25,67,8,1
+fear,23,2,12,4,2,7,0
+disgust,39,4,11,1,1,1,11

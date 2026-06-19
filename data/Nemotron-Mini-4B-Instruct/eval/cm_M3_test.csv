@@ -1,0 +1,8 @@
+True \ Pred (M3),surprise,anger,neutral,joy,sadness,fear,disgust
+surprise,207,44,8,16,0,5,1
+anger,122,200,5,8,3,6,1
+neutral,712,222,184,109,11,13,5
+joy,194,43,20,137,2,2,4
+sadness,100,61,14,5,25,3,0
+fear,33,8,1,1,1,6,0
+disgust,29,34,2,2,0,0,1

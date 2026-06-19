@@ -1,0 +1,15 @@
+Condition: MCOT  |  split: test
+
+              precision    recall  f1-score   support
+
+    surprise       0.24      0.23      0.23       281
+       anger       0.31      0.28      0.29       345
+     neutral       0.53      0.68      0.59      1256
+         joy       0.41      0.28      0.33       402
+     sadness       0.33      0.15      0.21       208
+        fear       0.15      0.08      0.10        50
+     disgust       0.12      0.06      0.08        68
+
+    accuracy                           0.44      2610
+   macro avg       0.30      0.25      0.26      2610
+weighted avg       0.42      0.44      0.42      2610

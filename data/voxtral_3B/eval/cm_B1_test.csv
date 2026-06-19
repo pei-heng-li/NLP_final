@@ -1,0 +1,8 @@
+True \ Pred (B1),surprise,anger,neutral,joy,sadness,fear,disgust
+surprise,0,0,281,0,0,0,0
+anger,0,0,345,0,0,0,0
+neutral,0,0,1256,0,0,0,0
+joy,0,0,402,0,0,0,0
+sadness,0,0,208,0,0,0,0
+fear,0,0,50,0,0,0,0
+disgust,0,0,68,0,0,0,0

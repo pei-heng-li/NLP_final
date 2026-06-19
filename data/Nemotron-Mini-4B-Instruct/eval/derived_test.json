@@ -1,0 +1,23 @@
+{
+  "Masking_Drop_T1-M1": 0.0986,
+  "Context_Recovery_M1-M2": -0.0125,
+  "Context_Recovery_M1-M3": -0.0827,
+  "Context_Gain_T1-T2": -0.0286,
+  "Context_Gain_T1-T3": -0.0927,
+  "Audio_Gain_M1-A2": -0.1601,
+  "Audio_Gain_M2-A3": -0.1569,
+  "Audio_Gain_M1-A2_mllm": "N/A",
+  "Audio_Gain_M2-A3_mllm": "N/A",
+  "MLLM_vs_Text_A1": "N/A",
+  "MLLM_vs_Text_A2": "N/A",
+  "MLLM_vs_Text_A3": "N/A",
+  "Prompt_Gain_T2-COT": -0.073,
+  "Prompt_Gain_T2-DEF": -0.0672,
+  "Prompt_Gain_T2-FS": -0.0328,
+  "Masking_Drop_COT-MCOT": 0.0999,
+  "Masking_Drop_DEF-MDEF": 0.1084,
+  "Masking_Drop_FS-MFS": 0.0934,
+  "Prompt_Gain_M2-MCOT": -0.0904,
+  "Prompt_Gain_M2-MDEF": -0.0931,
+  "Prompt_Gain_M2-MFS": -0.0437
+}
