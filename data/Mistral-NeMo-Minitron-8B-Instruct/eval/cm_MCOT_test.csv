@@ -1,0 +1,8 @@
+True \ Pred (MCOT),surprise,anger,neutral,joy,sadness,fear,disgust
+surprise,171,30,26,39,7,2,6
+anger,36,202,36,27,27,6,11
+neutral,187,160,455,289,93,33,39
+joy,51,30,46,241,19,6,9
+sadness,23,41,30,14,79,10,11
+fear,8,6,6,6,6,15,3
+disgust,6,28,2,5,2,2,23

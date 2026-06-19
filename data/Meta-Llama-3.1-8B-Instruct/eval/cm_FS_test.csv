@@ -1,0 +1,8 @@
+True \ Pred (FS),surprise,anger,neutral,joy,sadness,fear,disgust
+surprise,11,24,244,2,0,0,0
+anger,10,109,221,2,3,0,0
+neutral,34,45,1149,16,8,3,1
+joy,9,13,366,14,0,0,0
+sadness,9,13,172,1,11,2,0
+fear,5,5,33,0,2,5,0
+disgust,3,21,43,0,0,1,0
