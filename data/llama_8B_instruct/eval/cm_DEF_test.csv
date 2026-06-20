@@ -1,0 +1,8 @@
+True \ Pred (DEF),surprise,anger,neutral,joy,sadness,fear,disgust
+surprise,114,50,76,38,2,0,1
+anger,23,175,100,22,14,2,9
+neutral,35,101,1007,71,27,7,8
+joy,14,31,148,202,2,1,4
+sadness,8,39,84,11,59,4,3
+fear,8,14,12,4,7,5,0
+disgust,2,37,14,1,2,0,12

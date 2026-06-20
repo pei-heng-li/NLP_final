@@ -1,0 +1,8 @@
+True \ Pred (MFS),surprise,anger,neutral,joy,sadness,fear,disgust
+surprise,23,15,241,2,0,0,0
+anger,18,75,246,0,3,3,0
+neutral,49,40,1127,11,20,9,0
+joy,20,8,353,15,3,3,0
+sadness,3,7,173,1,21,3,0
+fear,1,2,38,0,4,5,0
+disgust,5,12,48,0,0,3,0
